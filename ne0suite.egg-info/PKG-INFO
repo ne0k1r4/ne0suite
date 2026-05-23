@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: ne0suite
+Version: 1.0.0
+Summary: Unified Operator CLI — GRIMOIRE · LightScan · WRAITH-NET
+Home-page: https://github.com/ne0k1r4/ne0suite
+Author: Light
+Author-email: neok1ra@proton.me
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Topic :: Security
+Classifier: Environment :: Console
+Requires-Python: >=3.10
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: requires-python
+Dynamic: summary
