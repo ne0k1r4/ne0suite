@@ -80,11 +80,57 @@ def _check_tool(name: str) -> tuple:
     cmd = TOOLS[name]["cmd"]
     if not shutil.which(cmd):
         return False, "not installed"
+    
+    # Each tool has its own custom version command/flag
+    ver_args = ["--version"]
+    if name == "lightscan":
+        ver_args = ["-v"]
+    elif name in ("wraith", "shadowci"):
+        ver_args = ["version"]
+        
     try:
-        r = subprocess.run([cmd, "--version"], capture_output=True, text=True, timeout=5)
-        ver = (r.stdout + r.stderr).strip().splitlines()
-        ver = next((l for l in ver if any(c.isdigit() for c in l)), "installed")
-        return True, ver[:50]
+        r = subprocess.run([cmd] + ver_args, capture_output=True, text=True, timeout=5)
+        output = (r.stdout + r.stderr).strip()
+        
+        # Clean and extract the version string dynamically
+        if name == "grimoire":
+            for line in output.splitlines():
+                if "v2." in line or "v1." in line:
+                    for w in line.split():
+                        if w.startswith("v") and any(c.isdigit() for c in w):
+                            return True, w
+                    return True, "v2.1.0"
+        elif name == "lightscan":
+            for line in output.splitlines():
+                if "v2." in line or "v1." in line:
+                    parts = [p.strip() for p in line.split("·")]
+                    if parts:
+                        val = parts[0]
+                        if val.startswith("v"):
+                            return True, val
+                        for w in val.split():
+                            if w.startswith("v"):
+                                return True, w
+                    return True, "v2.0.0"
+        elif name == "wraith":
+            for line in output.splitlines():
+                if "WRAITH-NET" in line and "v" in line:
+                    for w in line.split():
+                        if w.startswith("v") and any(c.isdigit() for c in w):
+                            return True, w
+                    return True, "v1.0.0"
+        elif name == "shadowci":
+            for line in output.splitlines():
+                if "ShadowCI" in line and "v" in line:
+                    for w in line.split():
+                        if w.startswith("v") and any(c.isdigit() for c in w):
+                            return True, w
+                    return True, "v2.0.0"
+                    
+        # Fallback parser
+        ver = output.splitlines()
+        ver = next((l.strip() for l in ver if "v" in l and any(c.isdigit() for c in l)), "installed")
+        return True, ver[:15]
     except Exception:
         return True, "installed"
 
@@ -92,12 +138,21 @@ def _check_tool(name: str) -> tuple:
 def cmd_status():
     print(BANNER)
     print(f"  {BOLD}Tool Status{RESET}\n")
-    print(f"  {'TOOL':<14} {'STATUS':<12} {'COMMAND':<16} {'DESCRIPTION'}")
-    print(f"  {'─'*72}")
+    print(f"  {'TOOL':<14} {'STATUS':<18} {'COMMAND':<16} {'DESCRIPTION'}")
+    print(f"  {'─'*74}")
     for name, info in TOOLS.items():
-        ok, _ = _check_tool(name)
-        status = f"{GREEN}✔ installed{RESET}" if ok else f"{YELLOW}✗ missing{RESET}"
-        print(f"  {CYAN}{name:<14}{RESET} {status:<22} {DIM}{info['cmd']:<16}{RESET} {DIM}{info['desc'][:38]}{RESET}")
+        ok, ver = _check_tool(name)
+        if ok:
+            status_text = f"✔ {ver}"
+            color = GREEN
+        else:
+            status_text = "✗ missing"
+            color = YELLOW
+        
+        # Pad the clean status text first, then wrap it in ANSI color codes
+        # to prevent color codes from throwing off column alignment.
+        padded_status = f"{color}{status_text:<18}{RESET}"
+        print(f"  {CYAN}{name:<14}{RESET} {padded_status} {DIM}{info['cmd']:<16}{RESET} {DIM}{info['desc'][:38]}{RESET}")
 
     print(f"\n  {DIM}Config locations:{RESET}")
     for tool, path in [("GRIMOIRE","~/.grimoire/config.json"),

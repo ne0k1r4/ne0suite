@@ -1,3 +1,0 @@
-[console_scripts]
-n0s = ne0suite.cli:main
-ne0suite = ne0suite.cli:main
