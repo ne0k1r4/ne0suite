@@ -55,6 +55,17 @@ TOOLS = {
         "desc":      "CI/CD security scanner — secrets, CVEs, misconfigs",
     },
 }
+# short aliases so i don't have to type the full name every single time
+ALIASES = {
+    "ls":      "lightscan",
+    "wn":      "wraith",
+    "g":       "grimoire",
+    "sh":      "shadowci",
+    "scan":    "lightscan",  # muscle memory from nmap days
+    "recon":   "wraith",
+    "shadow":  "shadowci",
+}
+
 
 def project_path(tool):
     return PROJECTS / TOOLS[tool]["project"]
