@@ -2,10 +2,11 @@
 """ne0suite - one entry point for the toolchain.
 
 Every tool i've written ends up in ~/dev/projects with its own way of being
-invoked. This is the start of something that routes to all of them.
+invoked. This routes to all of them.
 """
 
 import sys
+from pathlib import Path
 
 VERSION = "0.0.1"
 
@@ -28,6 +29,35 @@ BANNER_ART = [
 ]
 
 SEPARATOR = f"  {DIM}{'─' * 66}{RESET}"
+
+# all tools live under ~/dev/projects/ - change this if your layout differs
+PROJECTS = Path.home() / "dev" / "projects"
+
+TOOLS = {
+    "grimoire": {
+        "cmd":       "grimoire",
+        "project":   "grimoire",
+        "desc":      "Unified operator toolkit — recon, payloads, C2, stego, blue team",
+    },
+    "lightscan": {
+        "cmd":       "lightscan",
+        "project":   "Lightscan",  # capital L - that's how the repo is named
+        "desc":      "Async network scanner — ports, CVEs, scripts, web, brute force",
+    },
+    "wraith": {
+        "cmd":       "wraith",
+        "project":   "wraith-net",
+        "desc":      "Attack surface intel — subdomains, ASN, DNS security, takeover",
+    },
+    "shadowci": {
+        "cmd":       "shadowci",
+        "project":   "shadowci",
+        "desc":      "CI/CD security scanner — secrets, CVEs, misconfigs",
+    },
+}
+
+def project_path(tool):
+    return PROJECTS / TOOLS[tool]["project"]
 
 
 def print_banner():
