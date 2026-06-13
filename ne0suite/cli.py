@@ -30,6 +30,7 @@ BANNER_ART = [
     "  ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝",
 ]
 
+TAGLINE = f"  {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}"
 SEPARATOR = f"  {DIM}{'─' * 66}{RESET}"
 
 # all tools live under ~/dev/projects/ - change this if your layout differs
@@ -69,6 +70,14 @@ ALIASES = {
     "shadow":  "shadowci",
 }
 
+HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
+
+  {CYAN}grimoire{RESET}   {DIM}g{RESET}          Recon, C2, payloads, stego
+  {CYAN}lightscan{RESET}  {DIM}ls  scan{RESET}   Network scanner
+  {CYAN}wraith{RESET}     {DIM}wn  recon{RESET}  Attack surface intel
+  {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
+"""
+
 
 def project_path(tool):
     return PROJECTS / TOOLS[tool]["project"]
@@ -78,7 +87,21 @@ def print_banner():
     print()
     for line in BANNER_ART:
         print(f"{BOLD}{line}{RESET}")
+    print(TAGLINE)
     print(SEPARATOR)
+    print()
+
+
+def cmd_status():
+    print_banner()
+    print(f"  {BOLD}{'TOOL':<16} {'STATUS':<18} {'DESCRIPTION'}{RESET}")
+    print(f"  {'─' * 66}")
+    for name, info in TOOLS.items():
+        ok = bool(shutil.which(info["cmd"]))
+        raw = "✔ installed" if ok else "✗ missing"
+        color = GREEN if ok else YELLOW
+        padded = f"{color}{raw:<18}{RESET}"
+        print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}")
     print()
 
 
@@ -105,11 +128,15 @@ def main():
 
     if not args or args[0] in ("-h", "--help", "help"):
         print_banner()
-        print("usage: ne0suite <tool> [args...]")
+        print(HELP)
         sys.exit(0)
 
     if args[0] in ("-v", "--version", "version"):
         print(f"ne0suite v{VERSION}")
+        sys.exit(0)
+
+    if args[0] == "status":
+        cmd_status()
         sys.exit(0)
 
     cmd_dispatch(args[0].lower(), args[1:])
