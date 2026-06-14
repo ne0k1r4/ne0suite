@@ -83,6 +83,13 @@ TOOLS = {
         "desc":      "Static PE/ELF binary analyzer — anti-debug, anti-cheat, YARA (Rust)",
         "install":   "cd ~/dev/projects/sigil && cargo build --release",
     },
+    "kira-installer": {
+        "cmd":       None,  # just runs install.sh, nothing lands on PATH
+        "project":   "kira-installer",
+        "run":       "bash",
+        "desc":      "One-shot environment bootstrap for the full toolchain",
+        "install":   "git clone https://github.com/ne0k1r4/kira-installer ~/dev/projects/kira-installer",
+    },
 }
 
 # short aliases so i don't have to type the full name every single time
@@ -96,6 +103,7 @@ ALIASES = {
     "shadow":  "shadowci",
     "c2":      "akame",
     "analyze": "sigil",
+    "install": "kira-installer",
 }
 
 HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
@@ -106,6 +114,7 @@ HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RES
   {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
   {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
   {CYAN}sigil{RESET}      {DIM}analyze{RESET}    PE/ELF static analyzer {DIM}(Rust){RESET}
+  {CYAN}kira-installer{RESET} {DIM}install{RESET} Env bootstrap
 """
 
 
