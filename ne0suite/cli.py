@@ -76,6 +76,13 @@ TOOLS = {
         "desc":      "C2 teamserver — operator comms, implant mgmt (Rust)",
         "install":   "cd ~/dev/projects/akame && cargo build --release",
     },
+    "sigil": {
+        "cmd":       None,
+        "project":   "sigil",
+        "run":       "cargo",
+        "desc":      "Static PE/ELF binary analyzer — anti-debug, anti-cheat, YARA (Rust)",
+        "install":   "cd ~/dev/projects/sigil && cargo build --release",
+    },
 }
 
 # short aliases so i don't have to type the full name every single time
@@ -88,6 +95,7 @@ ALIASES = {
     "recon":   "wraith",
     "shadow":  "shadowci",
     "c2":      "akame",
+    "analyze": "sigil",
 }
 
 HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
@@ -97,6 +105,7 @@ HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RES
   {CYAN}wraith{RESET}     {DIM}wn  recon{RESET}  Attack surface intel
   {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
   {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
+  {CYAN}sigil{RESET}      {DIM}analyze{RESET}    PE/ELF static analyzer {DIM}(Rust){RESET}
 """
 
 
