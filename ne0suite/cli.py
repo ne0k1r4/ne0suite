@@ -2,11 +2,13 @@
 """ne0suite - one entry point for the toolchain.
 
 Every tool i've written ends up in ~/dev/projects with its own way of being
-invoked. This routes to all of them.
+invoked, its own version flag, and its own way of being installed. This
+dispatcher exists so i don't have to remember any of that.
 """
 
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,26 +38,43 @@ SEPARATOR = f"  {DIM}{'─' * 66}{RESET}"
 # all tools live under ~/dev/projects/ - change this if your layout differs
 PROJECTS = Path.home() / "dev" / "projects"
 
+# run modes: "bin" = PATH binary (execvp), "cargo" = Rust project,
+# "bash" = shell script project
 TOOLS = {
     "grimoire": {
         "cmd":       "grimoire",
         "project":   "grimoire",
+        "run":       "bin",
         "desc":      "Unified operator toolkit — recon, payloads, C2, stego, blue team",
+        "install":   "pip install -e ~/dev/projects/grimoire",
     },
     "lightscan": {
         "cmd":       "lightscan",
         "project":   "Lightscan",  # capital L - that's how the repo is named
+        "run":       "bin",
         "desc":      "Async network scanner — ports, CVEs, scripts, web, brute force",
+        "install":   "pip install -e ~/dev/projects/Lightscan",
     },
     "wraith": {
         "cmd":       "wraith",
         "project":   "wraith-net",
+        "run":       "bin",
         "desc":      "Attack surface intel — subdomains, ASN, DNS security, takeover",
+        "install":   "pip install -e ~/dev/projects/wraith-net",
     },
     "shadowci": {
         "cmd":       "shadowci",
         "project":   "shadowci",
+        "run":       "bin",
         "desc":      "CI/CD security scanner — secrets, CVEs, misconfigs",
+        "install":   "pip install -e ~/dev/projects/shadowci",
+    },
+    "akame": {
+        "cmd":       None,  # no PATH binary — invoked via cargo or target/release
+        "project":   "akame",
+        "run":       "cargo",
+        "desc":      "C2 teamserver — operator comms, implant mgmt (Rust)",
+        "install":   "cd ~/dev/projects/akame && cargo build --release",
     },
 }
 
@@ -68,6 +87,7 @@ ALIASES = {
     "scan":    "lightscan",  # muscle memory from nmap days
     "recon":   "wraith",
     "shadow":  "shadowci",
+    "c2":      "akame",
 }
 
 HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
@@ -76,11 +96,34 @@ HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RES
   {CYAN}lightscan{RESET}  {DIM}ls  scan{RESET}   Network scanner
   {CYAN}wraith{RESET}     {DIM}wn  recon{RESET}  Attack surface intel
   {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
+  {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
 """
 
 
 def project_path(tool):
     return PROJECTS / TOOLS[tool]["project"]
+
+
+def cargo_release_bin(tool):
+    # check if the project has already been built - avoids triggering cargo
+    pdir = project_path(tool)
+    name = TOOLS[tool].get("cmd") or tool
+    bin_path = pdir / "target" / "release" / name
+    return bin_path if bin_path.exists() else None
+
+
+def is_installed(tool):
+    info = TOOLS[tool]
+    if info["run"] == "bin":
+        return bool(shutil.which(info["cmd"]))
+    if info["run"] == "cargo":
+        if cargo_release_bin(tool):
+            return True
+        # project dir alone counts - cargo run will build it on first dispatch
+        return project_path(tool).exists()
+    if info["run"] == "bash":
+        return project_path(tool).exists()
+    return False
 
 
 def print_banner():
@@ -97,7 +140,7 @@ def cmd_status():
     print(f"  {BOLD}{'TOOL':<16} {'STATUS':<18} {'DESCRIPTION'}{RESET}")
     print(f"  {'─' * 66}")
     for name, info in TOOLS.items():
-        ok = bool(shutil.which(info["cmd"]))
+        ok = is_installed(name)
         raw = "✔ installed" if ok else "✗ missing"
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
@@ -115,12 +158,31 @@ def cmd_dispatch(tool, args):
         print(f"  {DIM}Aliases:   {', '.join(ALIASES.keys())}{RESET}")
         sys.exit(1)
 
-    if not shutil.which(TOOLS[tool]["cmd"]):
+    if not is_installed(tool):
         print(f"  {RED}[!]{RESET} {BOLD}{tool}{RESET} is not installed")
         print(f"  {DIM}expected:  {project_path(tool)}{RESET}")
         sys.exit(1)
 
-    os.execvp(TOOLS[tool]["cmd"], [TOOLS[tool]["cmd"]] + args)
+    info = TOOLS[tool]
+    pdir = project_path(tool)
+
+    if info["run"] == "bin":
+        os.execvp(info["cmd"], [info["cmd"]] + args)
+
+    elif info["run"] == "cargo":
+        rbin = cargo_release_bin(tool)
+        if rbin:
+            os.execvp(str(rbin), [str(rbin)] + args)
+        else:
+            # no built binary yet - build and run via cargo (slow first time)
+            print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
+                  f"(this will take a minute)", file=sys.stderr)
+            result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+            sys.exit(result.returncode)
+
+    elif info["run"] == "bash":
+        result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
+        sys.exit(result.returncode)
 
 
 def main():
