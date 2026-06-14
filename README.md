@@ -41,6 +41,13 @@ ne0suite grimoire sentinel --ioc 1.2.3.4
 ne0suite shadowci scan /path/to/repo
 ```
 
+Short aliases are resolved before dispatch: `g` → grimoire, `ls`/`scan` →
+lightscan, `wn`/`recon` → wraith, `sh`/`shadow` → shadowci, `c2` → akame,
+`analyze` → sigil, `install` → kira-installer.
+
+Set `NE0_DEBUG=1` to have ne0suite print the exact command it is about to run
+instead of just running it — useful when something misbehaves.
+
 ## Configuration & API Keys
 
 Configure credentials (Shodan, AbuseIPDB, VirusTotal, GitHub) in the template
