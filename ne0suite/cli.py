@@ -195,15 +195,26 @@ def cmd_dispatch(tool, args):
         os.execvp(info["cmd"], [info["cmd"]] + args)
 
     elif info["run"] == "cargo":
-        rbin = cargo_release_bin(tool)
-        if rbin:
-            os.execvp(str(rbin), [str(rbin)] + args)
-        else:
-            # no built binary yet - build and run via cargo (slow first time)
-            print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
+        if tool == "sigil":
+            # PATH first, then the release binary, then cargo run
+            if shutil.which("sigil"):
+                os.execvp("sigil", ["sigil"] + args)
+            rbin = cargo_release_bin("sigil")
+            if rbin:
+                os.execvp(str(rbin), [str(rbin)] + args)
+            print(f"  {YELLOW}[!]{RESET} sigil not built yet, running via cargo "
                   f"(this will take a minute)", file=sys.stderr)
             result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
             sys.exit(result.returncode)
+        else:
+            rbin = cargo_release_bin(tool)
+            if rbin:
+                os.execvp(str(rbin), [str(rbin)] + args)
+            else:
+                print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
+                      f"(this will take a minute)", file=sys.stderr)
+                result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+                sys.exit(result.returncode)
 
     elif info["run"] == "bash":
         result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
