@@ -177,12 +177,19 @@ def cmd_dispatch(tool, args):
         sys.exit(1)
 
     if not is_installed(tool):
-        print(f"  {RED}[!]{RESET} {BOLD}{tool}{RESET} is not installed")
+        info = TOOLS[tool]
+        print(f"\n  {RED}[!]{RESET} {BOLD}{tool}{RESET} is not installed\n")
         print(f"  {DIM}expected:  {project_path(tool)}{RESET}")
+        print(f"\n  {BOLD}install:{RESET}")
+        print(f"  {YELLOW}${RESET}  {info['install']}\n")
         sys.exit(1)
 
     info = TOOLS[tool]
     pdir = project_path(tool)
+
+    if os.environ.get("NE0_DEBUG"):
+        print(f"  {DIM}[debug] tool={tool} run={info['run']} dir={pdir} args={args}{RESET}",
+              file=sys.stderr)
 
     if info["run"] == "bin":
         os.execvp(info["cmd"], [info["cmd"]] + args)
