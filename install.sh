@@ -62,3 +62,11 @@ if [ -n "$SHELL_RC" ]; then
     done
     echo -e "${YELLOW}[!] Run 'source $SHELL_RC' to load aliases.${RESET}"
 fi
+
+# 5. Verify
+echo -e "${GREEN}[*] Verifying installation...${RESET}"
+if command -v ne0suite >/dev/null 2>&1; then
+    ne0suite status
+else
+    python -m ne0suite.cli status
+fi
