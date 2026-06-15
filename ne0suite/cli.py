@@ -56,7 +56,7 @@ TOOLS = {
         "install":   "pip install -e ~/dev/projects/Lightscan",
     },
     "wraith": {
-        "cmd":       "wraith",
+        "cmd":       "wraith-net",  # binary name differs from the subcommand key
         "project":   "wraith-net",
         "run":       "bin",
         "desc":      "Attack surface intel — subdomains, ASN, DNS security, takeover",
