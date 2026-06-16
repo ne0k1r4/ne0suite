@@ -55,3 +55,11 @@ files created during installation:
 
 * `~/.grimoire/config.json`
 * `~/.wraith-net/config.json`
+
+## Troubleshooting
+
+* `ne0suite status` says a tool is missing but you installed it — check the
+  tool's `cmd` name. `wraith` installs as `wraith-net`, which tripped me up
+  more than once.
+* A Rust tool runs `cargo` every time — the release binary hasn't been built
+  yet (`cargo build --release` in the project dir fixes it).
