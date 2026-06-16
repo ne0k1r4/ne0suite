@@ -163,6 +163,14 @@ def cmd_status():
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
         print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}")
+
+    print(f"\n  {DIM}Config:{RESET}")
+    for label, path in [("GRIMOIRE", "~/.grimoire/config.json"),
+                        ("WRAITH-NET", "~/.wraith-net/config.json")]:
+        full = Path(path.replace("~", str(Path.home())))
+        color = GREEN if full.exists() else DIM
+        mark = "✔" if full.exists() else "✗"
+        print(f"  {color}{mark}{RESET}  {label:<14} {DIM}{path}{RESET}")
     print()
 
 
