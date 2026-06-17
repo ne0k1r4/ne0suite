@@ -12,7 +12,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "0.0.1"
+VERSION = "0.1.0"
 
 # raw ANSI, zero deps, works in any terminal that isn't ancient
 RED = "\033[91m"

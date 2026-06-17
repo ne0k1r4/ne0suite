@@ -2,8 +2,8 @@ from setuptools import setup, find_packages
 
 setup(
     name="ne0suite",
-    version="0.0.1",
-    description="Unified Operator CLI — one entry point for the toolchain",
+    version="0.1.0",
+    description="Unified Operator CLI — GRIMOIRE · LightScan · WRAITH-NET · ShadowCI · akame · sigil",
     author="Light",
     author_email="neok1ra@proton.me",
     url="https://github.com/ne0k1r4/ne0suite",
@@ -16,4 +16,10 @@ setup(
             "ne0=ne0suite.cli:main",
         ],
     },
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Operating System :: POSIX :: Linux",
+        "Topic :: Security",
+        "Environment :: Console",
+    ],
 )
