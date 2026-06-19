@@ -1,20 +1,17 @@
-"""
-ne0suite/cli.py — Unified Operator CLI
-Dispatches to GRIMOIRE, LightScan, and WRAITH-NET.
-"""
-
 import sys
 import os
 import shutil
 import subprocess
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 
+# raw ANSI — no deps, works everywhere, respects the terminal
 RED    = "\033[91m"
 GREEN  = "\033[92m"
 YELLOW = "\033[93m"
 CYAN   = "\033[96m"
+GOLD   = "\033[38;2;200;160;60m"  # 24-bit, matches the DN notebook cover
 DIM    = "\033[2m"
 BOLD   = "\033[1m"
 RESET  = "\033[0m"
@@ -27,25 +24,102 @@ BANNER = f"""
   ██║ ╚████║███████╗╚██████╔╝███████║╚██████╔╝██║   ██║   ███████╗
   ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝{RESET}
   {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}
-  {DIM}GRIMOIRE · LightScan · WRAITH-NET · ShadowCI{RESET}
+  {DIM}GRIMOIRE · LightScan · WRAITH-NET · ShadowCI · akame · sigil{RESET}
 """
 
+# all tools live under ~/dev/projects/ — change this if your layout differs
+PROJECTS = Path.home() / "dev" / "projects"
+
+# each tool entry drives both resolution and the status table.
+# run modes: "bin" = PATH binary (execvp), "cargo" = Rust project, "bash" = shell script
+# ver_probe: ("flag", <flag>) probes a PATH binary; ("cargo_meta",) reads Cargo.toml directly
+# cmd: None for tools that don't produce a standalone PATH binary (cargo/bash tools)
 TOOLS = {
-    "grimoire":  {"cmd": "grimoire",   "desc": "Unified operator toolkit — recon, payloads, C2, stego, blue team"},
-    "lightscan": {"cmd": "lightscan",  "desc": "Async network scanner — ports, CVEs, scripts, web, brute force"},
-    "wraith":    {"cmd": "wraith-net", "desc": "Attack surface intel — subdomains, ASN, DNS security, takeover"},
-    "shadowci":  {"cmd": "shadowci",   "desc": "CI/CD security scanner — secrets, CVEs, misconfigs"},
+    "grimoire": {
+        "cmd":       "grimoire",
+        "project":   "grimoire",
+        "run":       "bin",
+        "desc":      "Unified operator toolkit — recon, payloads, C2, stego, blue team",
+        "ver_probe": ("flag", "--version"),
+        "install":   "pip install -e ~/dev/projects/grimoire",
+    },
+    "lightscan": {
+        "cmd":       "lightscan",
+        "project":   "Lightscan",  # capital L — that's how the repo is named
+        "run":       "bin",
+        "desc":      "Async network scanner — ports, CVEs, scripts, web, brute force",
+        "ver_probe": ("flag", "-v"),
+        "install":   "pip install -e ~/dev/projects/Lightscan",
+    },
+    "wraith": {
+        "cmd":       "wraith-net",  # binary name differs from the subcommand key
+        "project":   "wraith-net",
+        "run":       "bin",
+        "desc":      "Attack surface intel — subdomains, ASN, DNS security, takeover",
+        "ver_probe": ("flag", "version"),
+        "install":   "pip install -e ~/dev/projects/wraith-net",
+    },
+    "shadowci": {
+        "cmd":       "shadowci",
+        "project":   "shadowci",
+        "run":       "bin",
+        "desc":      "CI/CD security scanner — secrets, CVEs, misconfigs",
+        "ver_probe": ("flag", "version"),
+        "install":   "pip install -e ~/dev/projects/shadowci",
+    },
+    "akame": {
+        "cmd":       None,  # no PATH binary — invoked via cargo or target/release/akame
+        "project":   "akame",
+        "run":       "cargo",
+        "desc":      "C2 teamserver — operator comms, implant mgmt (Rust)",
+        "ver_probe": ("cargo_meta",),
+        "install":   "cd ~/dev/projects/akame && cargo build --release",
+    },
+    # sigil is a compiled Rust binary (target/release/sigil after cargo build --release).
+    # it has a PATH-installable binary unlike akame, so cmd is set.
+    # resolution order: PATH → target/release/sigil → cargo run --release (slow fallback)
+    "sigil": {
+        "cmd":       "sigil",
+        "project":   "sigil",
+        "run":       "cargo",
+        "desc":      "Static PE/ELF binary analyzer — anti-debug, anti-cheat, YARA (Rust)",
+        "ver_probe": ("cargo_meta",),
+        "install":   "cd ~/dev/projects/sigil && cargo build --release",
+    },
+    "kira-installer": {
+        "cmd":       None,  # just runs install.sh, nothing gets added to PATH
+        "project":   "kira-installer",
+        "run":       "bash",
+        "desc":      "One-shot environment bootstrap for the full toolchain",
+        "ver_probe": None,  # no version — it's a script, not a versioned binary
+        "install":   "git clone https://github.com/ne0k1r4/kira-installer ~/dev/projects/kira-installer",
+    },
 }
 
+# short aliases — so i don't have to type the full name every time
 ALIASES = {
-    "ls": "lightscan", "wn": "wraith",
-    "g":  "grimoire",  "sh": "shadowci",
-    "scan": "lightscan", "recon": "wraith",
-    "shadow": "shadowci",
+    "ls":      "lightscan",
+    "wn":      "wraith",
+    "g":       "grimoire",
+    "sh":      "shadowci",
+    "scan":    "lightscan",  # muscle memory from nmap days
+    "recon":   "wraith",
+    "shadow":  "shadowci",
+    "c2":      "akame",
+    "analyze": "sigil",
+    "install": "kira-installer",
 }
+
+# pulled from sigil's clap subcommand definitions in src/main.rs
+SIGIL_SUBCMDS = [
+    "scan", "headers", "strings", "imports", "symbols", "tls",
+    "hashes", "entropy", "antidebug", "anticheat", "disasm",
+    "pattern", "diff", "report", "batch", "overlay", "resources",
+    "clr", "full-disasm", "yara",
+]
 
 HELP = f"""
-{RED}{BOLD}ne0suite{RESET} — Unified Operator CLI
+{RED}{BOLD}ne0suite{RESET} — Unified Operator CLI  {DIM}v{VERSION}{RESET}
 
 {BOLD}Usage:{RESET}
   ne0suite <tool> [args...]
@@ -53,142 +127,255 @@ HELP = f"""
   ne0suite help
 
 {BOLD}Tools:{RESET}
-  {CYAN}grimoire{RESET}   GRIMOIRE v2.1 — full operator toolkit
-  {CYAN}lightscan{RESET}  LightScan v2.0 PHANTOM — network scanner
-  {CYAN}wraith{RESET}     WRAITH-NET v1.0 — attack surface intel
-  {CYAN}shadowci{RESET}   ShadowCI v1.2 — CI/CD security scanner
+  {CYAN}grimoire{RESET}        {DIM}GRIMOIRE — full operator toolkit{RESET}
+  {CYAN}lightscan{RESET}       {DIM}LightScan — async network scanner{RESET}
+  {CYAN}wraith{RESET}          {DIM}WRAITH-NET — attack surface intel{RESET}
+  {CYAN}shadowci{RESET}        {DIM}ShadowCI — CI/CD security scanner{RESET}
+  {CYAN}akame{RESET}           {DIM}akame — C2 teamserver (Rust){RESET}
+  {CYAN}sigil{RESET}           {DIM}sigil — static PE/ELF analyzer, anti-debug/cheat (Rust){RESET}
+  {CYAN}kira-installer{RESET}  {DIM}kira-installer — full env bootstrap{RESET}
 
 {BOLD}Aliases:{RESET}
-  {CYAN}g{RESET}  → grimoire    {CYAN}ls{RESET}  → lightscan
-  {CYAN}wn{RESET} → wraith      {CYAN}sh{RESET}  → shadowci
+  {CYAN}analyze{RESET}  → sigil          {CYAN}c2{RESET}      → akame
+  {CYAN}install{RESET}  → kira-installer {CYAN}g{RESET}       → grimoire
+  {CYAN}ls{RESET}       → lightscan      {CYAN}wn{RESET}      → wraith
+  {CYAN}scan{RESET}     → lightscan      {CYAN}recon{RESET}   → wraith
 
 {BOLD}Examples:{RESET}
-  ne0suite wraith scan github.com
-  ne0suite wraith scan target.com --axfr --brute-subs
   ne0suite lightscan --scan -t 10.0.0.1 -p top100 --sv --cve
-  ne0suite lightscan --web-scan http://target.com
+  ne0suite wraith scan target.com --axfr --brute-subs
+  ne0suite akame
+  ne0suite sigil scan ./malware.exe
+  ne0suite sigil anticheat ./game.exe
+  ne0suite sigil antidebug ./sample.exe
+  ne0suite sigil diff ./v1.exe ./v2.exe
+  ne0suite sigil report ./sample.exe --html -o report.html
+  ne0suite sigil yara ./sample.exe -r ./rules/
   ne0suite grimoire sentinel --ioc 185.220.101.1
-  ne0suite grimoire sentinel --scan /var/log
-  ne0suite grimoire wraith target.com --report
-  ne0suite grimoire forge
   ne0suite shadowci /path/to/repo
+  ne0suite kira-installer
   ne0suite status
+
+{BOLD}sigil subcommands:{RESET}
+  {DIM}{', '.join(SIGIL_SUBCMDS)}{RESET}
+
+{DIM}Set NE0_DEBUG=1 to print the resolved command before exec.{RESET}
 """
 
 
-def _check_tool(name: str) -> tuple:
-    cmd = TOOLS[name]["cmd"]
-    if not shutil.which(cmd):
+def project_path(tool):
+    return PROJECTS / TOOLS[tool]["project"]
+
+
+def cargo_release_bin(tool):
+    # check if the project has already been built — avoids triggering cargo unnecessarily
+    pdir = project_path(tool)
+    name = TOOLS[tool].get("cmd") or tool  # fall back to tool name if cmd is None
+    bin_path = pdir / "target" / "release" / name
+    return bin_path if bin_path.exists() else None
+
+
+def is_installed(tool):
+    info = TOOLS[tool]
+
+    if info["run"] == "bin":
+        # for Python tools, just check if the entry_point landed on PATH
+        return bool(shutil.which(info["cmd"]))
+
+    if info["run"] == "cargo":
+        # prefer PATH or compiled binary over just "project dir exists"
+        # project dir existing without a build isn't really "installed"
+        if info.get("cmd") and shutil.which(info["cmd"]):
+            return True
+        if cargo_release_bin(tool):
+            return True
+        # project dir alone counts — cargo run will build it on first dispatch
+        return project_path(tool).exists()
+
+    if info["run"] == "bash":
+        # kira-installer just needs the repo cloned — install.sh does the rest
+        return project_path(tool).exists()
+
+    return False
+
+
+def check_tool(name):
+    if not is_installed(name):
         return False, "not installed"
-    
-    # Each tool has its own custom version command/flag
-    ver_args = ["--version"]
-    if name == "lightscan":
-        ver_args = ["-v"]
-    elif name in ("wraith", "shadowci"):
-        ver_args = ["version"]
-        
-    try:
-        r = subprocess.run([cmd] + ver_args, capture_output=True, text=True, timeout=5)
-        output = (r.stdout + r.stderr).strip()
-        
-        # Clean and extract the version string dynamically
-        if name == "grimoire":
-            for line in output.splitlines():
-                if "v2." in line or "v1." in line:
-                    for w in line.split():
-                        if w.startswith("v") and any(c.isdigit() for c in w):
-                            return True, w
-                    return True, "v2.1.0"
-        elif name == "lightscan":
-            for line in output.splitlines():
-                if "v2." in line or "v1." in line:
-                    parts = [p.strip() for p in line.split("·")]
-                    if parts:
-                        val = parts[0]
-                        if val.startswith("v"):
-                            return True, val
-                        for w in val.split():
-                            if w.startswith("v"):
-                                return True, w
-                    return True, "v2.0.0"
-        elif name == "wraith":
-            for line in output.splitlines():
-                if "WRAITH-NET" in line and "v" in line:
-                    for w in line.split():
-                        if w.startswith("v") and any(c.isdigit() for c in w):
-                            return True, w
-                    return True, "v1.0.0"
-        elif name == "shadowci":
-            for line in output.splitlines():
-                if "ShadowCI" in line and "v" in line:
-                    for w in line.split():
-                        if w.startswith("v") and any(c.isdigit() for c in w):
-                            return True, w
-                    return True, "v2.0.0"
-                    
-        # Fallback parser
-        ver = output.splitlines()
-        ver = next((l.strip() for l in ver if "v" in l and any(c.isdigit() for c in l)), "installed")
-        return True, ver[:15]
-    except Exception:
-        return True, "installed"
+
+    info = TOOLS[name]
+    probe = info.get("ver_probe")
+
+    if probe is None:
+        # bash tools don't have a version — just confirm presence
+        return True, "project found"
+
+    if probe[0] == "cargo_meta":
+        # read from Cargo.toml — avoids invoking cargo just for a version string
+        toml = project_path(name) / "Cargo.toml"
+        try:
+            for line in toml.read_text().splitlines():
+                if line.strip().startswith("version"):
+                    v = line.split("=")[1].strip().strip('"')
+                    return True, f"v{v}"
+        except Exception:
+            pass
+        # Cargo.toml missing or unparseable — try the binary directly if it exists
+        rbin = cargo_release_bin(name)
+        if rbin:
+            try:
+                r = subprocess.run([str(rbin), "--version"],
+                                   capture_output=True, text=True, timeout=5)
+                out = (r.stdout + r.stderr).strip()
+                for word in out.split():
+                    if word.startswith("v") and any(c.isdigit() for c in word):
+                        return True, word[:12]
+            except Exception:
+                pass
+        return True, "built"
+
+    if probe[0] == "flag":
+        # Python tools — run the binary with its version flag and scrape the output
+        try:
+            r = subprocess.run([info["cmd"], probe[1]],
+                               capture_output=True, text=True, timeout=5)
+            out = (r.stdout + r.stderr).strip()
+            for line in out.splitlines():
+                for word in line.split():
+                    if word.startswith("v") and any(c.isdigit() for c in word):
+                        return True, word[:12]
+            return True, "installed"
+        except Exception:
+            return True, "installed"
+
+    return True, "installed"
 
 
 def cmd_status():
     print(BANNER)
     print(f"  {BOLD}Tool Status{RESET}\n")
-    print(f"  {'TOOL':<14} {'STATUS':<18} {'COMMAND':<16} {'DESCRIPTION'}")
-    print(f"  {'─'*74}")
-    for name, info in TOOLS.items():
-        ok, ver = _check_tool(name)
-        if ok:
-            status_text = f"✔ {ver}"
-            color = GREEN
-        else:
-            status_text = "✗ missing"
-            color = YELLOW
-        
-        # Pad the clean status text first, then wrap it in ANSI color codes
-        # to prevent color codes from throwing off column alignment.
-        padded_status = f"{color}{status_text:<18}{RESET}"
-        print(f"  {CYAN}{name:<14}{RESET} {padded_status} {DIM}{info['cmd']:<16}{RESET} {DIM}{info['desc'][:38]}{RESET}")
+    print(f"  {'TOOL':<16} {'STATUS':<20} {'DESCRIPTION'}")
+    print(f"  {'─' * 70}")
 
+    for name, info in TOOLS.items():
+        ok, ver = check_tool(name)
+        raw = f"✔ {ver}" if ok else "✗ missing"
+        color = GREEN if ok else YELLOW
+        padded = f"{color}{raw:<18}{RESET}"
+        print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:44]}{RESET}")
+
+    # quick sanity check for tools that need config files to work properly
     print(f"\n  {DIM}Config locations:{RESET}")
-    for tool, path in [("GRIMOIRE","~/.grimoire/config.json"),
-                       ("WRAITH-NET","~/.wraith-net/config.json")]:
+    for label, path in [("GRIMOIRE", "~/.grimoire/config.json"),
+                        ("WRAITH-NET", "~/.wraith-net/config.json")]:
         full = Path(path.replace("~", str(Path.home())))
-        c = GREEN if full.exists() else DIM
-        print(f"  {c}{'✔' if full.exists() else '✗'}{RESET}  {tool:<12} {DIM}{path}{RESET}")
+        color = GREEN if full.exists() else DIM
+        mark = "✔" if full.exists() else "✗"
+        print(f"  {color}{mark}{RESET}  {label:<14} {DIM}{path}{RESET}")
     print()
 
 
-def cmd_dispatch(tool: str, args: list):
+def resolve_sigil():
+    # PATH first — if someone did `cargo install` or symlinked the binary manually
+    if shutil.which("sigil"):
+        return ["sigil"]
+    rbin = cargo_release_bin("sigil")
+    if rbin:
+        return [str(rbin)]
+    return None  # caller falls back to cargo run --release
+
+
+def cmd_dispatch(tool, args):
+    # resolve alias before anything else
     tool = ALIASES.get(tool, tool)
+
     if tool not in TOOLS:
         print(f"  {RED}[!]{RESET} Unknown tool: {tool}")
-        print(f"  {DIM}Available: {', '.join(TOOLS.keys())} | Aliases: {', '.join(ALIASES.keys())}{RESET}")
+        print(f"  {DIM}Available: {', '.join(TOOLS.keys())}{RESET}")
+        print(f"  {DIM}Aliases:   {', '.join(ALIASES.keys())}{RESET}")
         sys.exit(1)
-    cmd = TOOLS[tool]["cmd"]
-    if not shutil.which(cmd):
-        print(f"  {RED}[!]{RESET} {tool} not installed — '{cmd}' not found in PATH")
-        print(f"  {DIM}Install: pip install -e ~/dev/projects/{tool}{RESET}")
+
+    if not is_installed(tool):
+        info = TOOLS[tool]
+        print(f"\n  {RED}[!]{RESET} {BOLD}{tool}{RESET} is not installed\n")
+        print(f"  {DIM}expected:  {project_path(tool)}{RESET}")
+        if info.get("cmd"):
+            print(f"  {DIM}or PATH:   {info['cmd']}{RESET}")
+        print(f"\n  {BOLD}install:{RESET}")
+        print(f"  {GOLD}${RESET}  {info['install']}\n")
+        if tool == "sigil":
+            # show available subcommands so the user knows what they're missing
+            print(f"  {DIM}subcommands: {', '.join(SIGIL_SUBCMDS)}{RESET}\n")
         sys.exit(1)
-    os.execvp(cmd, [cmd] + args)
+
+    info = TOOLS[tool]
+    pdir = project_path(tool)
+
+    if os.environ.get("NE0_DEBUG"):
+        print(f"  {DIM}[debug] tool={tool} run={info['run']} dir={pdir} args={args}{RESET}",
+              file=sys.stderr)
+
+    if info["run"] == "bin":
+        # execvp replaces this process entirely — tool owns the terminal from here
+        # no subprocess overhead, signals propagate correctly, exit code is the tool's
+        os.execvp(info["cmd"], [info["cmd"]] + args)
+
+    elif info["run"] == "cargo":
+        if tool == "sigil":
+            resolved = resolve_sigil()
+            if resolved:
+                if os.environ.get("NE0_DEBUG"):
+                    print(f"  {DIM}[debug] sigil binary: {resolved[0]}{RESET}", file=sys.stderr)
+                # same clean execvp behavior as bin tools once we have the binary path
+                os.execvp(resolved[0], resolved + args)
+            else:
+                # project dir exists but no compiled binary yet — trigger a build via cargo
+                print(f"  {YELLOW}[!]{RESET} sigil not built yet, running via cargo (this will take a minute)",
+                      file=sys.stderr)
+                print(f"  {DIM}run `cd {pdir} && cargo build --release` to avoid this next time{RESET}",
+                      file=sys.stderr)
+                try:
+                    result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+                    sys.exit(result.returncode)
+                except KeyboardInterrupt:
+                    sys.exit(130)
+        else:
+            # akame + any future Rust tools follow the same pattern
+            rbin = cargo_release_bin(tool)
+            if rbin:
+                os.execvp(str(rbin), [str(rbin)] + args)
+            else:
+                try:
+                    result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+                    sys.exit(result.returncode)
+                except KeyboardInterrupt:
+                    sys.exit(130)
+
+    elif info["run"] == "bash":
+        try:
+            result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
+            sys.exit(result.returncode)
+        except KeyboardInterrupt:
+            sys.exit(130)
 
 
 def main():
     args = sys.argv[1:]
+
+    # no args at all — just show the help, don't error
     if not args or args[0] in ("-h", "--help", "help"):
         print(BANNER)
         print(HELP)
         sys.exit(0)
+
     if args[0] in ("-v", "--version", "version"):
         print(f"ne0suite v{VERSION}")
         sys.exit(0)
+
     if args[0] == "status":
         cmd_status()
         sys.exit(0)
+
     cmd_dispatch(args[0].lower(), args[1:])
 
 
