@@ -24,7 +24,6 @@ BANNER = f"""
   ██║ ╚████║███████╗╚██████╔╝███████║╚██████╔╝██║   ██║   ███████╗
   ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝{RESET}
   {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}
-  {DIM}GRIMOIRE · LightScan · WRAITH-NET · ShadowCI · akame · sigil{RESET}
 """
 
 # all tools live under ~/dev/projects/ — change this if your layout differs
@@ -119,45 +118,24 @@ SIGIL_SUBCMDS = [
 ]
 
 HELP = f"""
-{RED}{BOLD}ne0suite{RESET} — Unified Operator CLI  {DIM}v{VERSION}{RESET}
-
 {BOLD}Usage:{RESET}
   ne0suite <tool> [args...]
   ne0suite status
-  ne0suite help
 
-{BOLD}Tools:{RESET}
-  {CYAN}grimoire{RESET}        {DIM}GRIMOIRE — full operator toolkit{RESET}
-  {CYAN}lightscan{RESET}       {DIM}LightScan — async network scanner{RESET}
-  {CYAN}wraith{RESET}          {DIM}WRAITH-NET — attack surface intel{RESET}
-  {CYAN}shadowci{RESET}        {DIM}ShadowCI — CI/CD security scanner{RESET}
-  {CYAN}akame{RESET}           {DIM}akame — C2 teamserver (Rust){RESET}
-  {CYAN}sigil{RESET}           {DIM}sigil — static PE/ELF analyzer, anti-debug/cheat (Rust){RESET}
-  {CYAN}kira-installer{RESET}  {DIM}kira-installer — full env bootstrap{RESET}
-
-{BOLD}Aliases:{RESET}
-  {CYAN}analyze{RESET}  → sigil          {CYAN}c2{RESET}      → akame
-  {CYAN}install{RESET}  → kira-installer {CYAN}g{RESET}       → grimoire
-  {CYAN}ls{RESET}       → lightscan      {CYAN}wn{RESET}      → wraith
-  {CYAN}scan{RESET}     → lightscan      {CYAN}recon{RESET}   → wraith
+{BOLD}Tools & Aliases:{RESET}
+  {CYAN}grimoire{RESET}       (g)       {DIM}Operator toolkit (recon, C2, stego){RESET}
+  {CYAN}lightscan{RESET}      (ls, scan){DIM}Async network scanner{RESET}
+  {CYAN}wraith{RESET}         (wn, recon){DIM}Attack surface intel{RESET}
+  {CYAN}shadowci{RESET}       (sh)      {DIM}CI/CD security scanner{RESET}
+  {CYAN}akame{RESET}          (c2)      {DIM}C2 teamserver (Rust){RESET}
+  {CYAN}sigil{RESET}          (analyze) {DIM}PE/ELF static analyzer (Rust){RESET}
+  {CYAN}kira-installer{RESET} (install) {DIM}Environment bootstrap installer{RESET}
 
 {BOLD}Examples:{RESET}
-  ne0suite lightscan --scan -t 10.0.0.1 -p top100 --sv --cve
-  ne0suite wraith scan target.com --axfr --brute-subs
-  ne0suite akame
+  ne0suite lightscan --scan -t 10.0.0.1
+  ne0suite wraith scan target.com
   ne0suite sigil scan ./malware.exe
-  ne0suite sigil anticheat ./game.exe
-  ne0suite sigil antidebug ./sample.exe
-  ne0suite sigil diff ./v1.exe ./v2.exe
-  ne0suite sigil report ./sample.exe --html -o report.html
-  ne0suite sigil yara ./sample.exe -r ./rules/
-  ne0suite grimoire sentinel --ioc 185.220.101.1
-  ne0suite shadowci /path/to/repo
-  ne0suite kira-installer
   ne0suite status
-
-{BOLD}sigil subcommands:{RESET}
-  {DIM}{', '.join(SIGIL_SUBCMDS)}{RESET}
 
 {DIM}Set NE0_DEBUG=1 to print the resolved command before exec.{RESET}
 """
