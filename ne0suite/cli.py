@@ -10,9 +10,10 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-VERSION = "0.1.0"
+VERSION = "1.0.0"
 
 # raw ANSI, zero deps, works in any terminal that isn't ancient
 RED = "\033[91m"
@@ -32,8 +33,43 @@ BANNER_ART = [
     "  ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝",
 ]
 
-TAGLINE = f"  {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}"
+# deep crimson -> bright red, one stop per banner line
+BANNER_GRADIENT = [
+    "\033[38;2;120;20;20m",
+    "\033[38;2;160;25;25m",
+    "\033[38;2;200;35;35m",
+    "\033[38;2;220;50;50m",
+    "\033[38;2;240;70;70m",
+    "\033[38;2;255;90;90m",
+]
+
 SEPARATOR = f"  {DIM}{'─' * 66}{RESET}"
+
+
+def print_banner(animate=True):
+    """Line-by-line gradient reveal when stdout is a tty, plain dump otherwise."""
+    print()
+    if animate and sys.stdout.isatty():
+        for i, line in enumerate(BANNER_ART):
+            color = BANNER_GRADIENT[i]
+            sys.stdout.write(f"{BOLD}{color}{line}{RESET}\n")
+            sys.stdout.flush()
+            time.sleep(0.04)
+        time.sleep(0.08)
+        # tagline typed out character by character
+        tagline_raw = f"  Unified Operator Suite · by Light (Neok1ra) · v{VERSION}"
+        for ch in tagline_raw:
+            sys.stdout.write(f"{DIM}{ch}{RESET}")
+            sys.stdout.flush()
+            time.sleep(0.008)
+        print()
+    else:
+        for i, line in enumerate(BANNER_ART):
+            print(f"{BOLD}{BANNER_GRADIENT[i]}{line}{RESET}")
+        print(f"  {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}")
+    print(SEPARATOR)
+    print()
+
 
 # all tools live under ~/dev/projects/ - change this if your layout differs
 PROJECTS = Path.home() / "dev" / "projects"
@@ -56,7 +92,7 @@ TOOLS = {
         "install":   "pip install -e ~/dev/projects/Lightscan",
     },
     "wraith": {
-        "cmd":       "wraith-net",  # binary name differs from the subcommand key
+        "cmd":       "wraith",
         "project":   "wraith-net",
         "run":       "bin",
         "desc":      "Attack surface intel — subdomains, ASN, DNS security, takeover",
@@ -77,7 +113,7 @@ TOOLS = {
         "install":   "cd ~/dev/projects/akame && cargo build --release",
     },
     "sigil": {
-        "cmd":       None,
+        "cmd":       "sigil",
         "project":   "sigil",
         "run":       "cargo",
         "desc":      "Static PE/ELF binary analyzer — anti-debug, anti-cheat, YARA (Rust)",
@@ -135,22 +171,14 @@ def is_installed(tool):
     if info["run"] == "bin":
         return bool(shutil.which(info["cmd"]))
     if info["run"] == "cargo":
+        if info.get("cmd") and shutil.which(info["cmd"]):
+            return True
         if cargo_release_bin(tool):
             return True
-        # project dir alone counts - cargo run will build it on first dispatch
         return project_path(tool).exists()
     if info["run"] == "bash":
         return project_path(tool).exists()
     return False
-
-
-def print_banner():
-    print()
-    for line in BANNER_ART:
-        print(f"{BOLD}{line}{RESET}")
-    print(TAGLINE)
-    print(SEPARATOR)
-    print()
 
 
 def cmd_status():
@@ -163,14 +191,6 @@ def cmd_status():
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
         print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}")
-
-    print(f"\n  {DIM}Config:{RESET}")
-    for label, path in [("GRIMOIRE", "~/.grimoire/config.json"),
-                        ("WRAITH-NET", "~/.wraith-net/config.json")]:
-        full = Path(path.replace("~", str(Path.home())))
-        color = GREEN if full.exists() else DIM
-        mark = "✔" if full.exists() else "✗"
-        print(f"  {color}{mark}{RESET}  {label:<14} {DIM}{path}{RESET}")
     print()
 
 
@@ -203,26 +223,15 @@ def cmd_dispatch(tool, args):
         os.execvp(info["cmd"], [info["cmd"]] + args)
 
     elif info["run"] == "cargo":
-        if tool == "sigil":
-            # PATH first, then the release binary, then cargo run
-            if shutil.which("sigil"):
-                os.execvp("sigil", ["sigil"] + args)
-            rbin = cargo_release_bin("sigil")
-            if rbin:
-                os.execvp(str(rbin), [str(rbin)] + args)
-            print(f"  {YELLOW}[!]{RESET} sigil not built yet, running via cargo "
+        rbin = cargo_release_bin(tool)
+        if rbin:
+            os.execvp(str(rbin), [str(rbin)] + args)
+        else:
+            # no built binary yet - build and run via cargo (slow first time)
+            print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
                   f"(this will take a minute)", file=sys.stderr)
             result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
             sys.exit(result.returncode)
-        else:
-            rbin = cargo_release_bin(tool)
-            if rbin:
-                os.execvp(str(rbin), [str(rbin)] + args)
-            else:
-                print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
-                      f"(this will take a minute)", file=sys.stderr)
-                result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
-                sys.exit(result.returncode)
 
     elif info["run"] == "bash":
         result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
