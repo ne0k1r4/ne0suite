@@ -43,6 +43,7 @@ BANNER_GRADIENT = [
     "\033[38;2;255;90;90m",
 ]
 
+TAGLINE = f"  {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}"
 SEPARATOR = f"  {DIM}{'─' * 66}{RESET}"
 
 
@@ -66,7 +67,7 @@ def print_banner(animate=True):
     else:
         for i, line in enumerate(BANNER_ART):
             print(f"{BOLD}{BANNER_GRADIENT[i]}{line}{RESET}")
-        print(f"  {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}")
+        print(TAGLINE)
     print(SEPARATOR)
     print()
 
@@ -181,8 +182,29 @@ def is_installed(tool):
     return False
 
 
+def _spinner(msg, duration=0.6):
+    """Quick inline spinner while probing the toolchain."""
+    if not sys.stdout.isatty():
+        print(f"  {msg}")
+        return
+    frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    end_time = time.monotonic() + duration
+    i = 0
+    while time.monotonic() < end_time:
+        sys.stdout.write(f"\r  {RED}{frames[i % len(frames)]}{RESET} {msg}")
+        sys.stdout.flush()
+        time.sleep(0.06)
+        i += 1
+    sys.stdout.write(f"\r  {GREEN}✔{RESET} {msg}\n")
+    sys.stdout.flush()
+
+
 def cmd_status():
     print_banner()
+
+    _spinner("Scanning toolchain...", 0.5)
+    print()
+
     print(f"  {BOLD}{'TOOL':<16} {'STATUS':<18} {'DESCRIPTION'}{RESET}")
     print(f"  {'─' * 66}")
     for name, info in TOOLS.items():
