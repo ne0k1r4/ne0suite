@@ -157,27 +157,15 @@ SIGIL_SUBCMDS = [
     "clr", "full-disasm", "yara",
 ]
 
-HELP = f"""
-{BOLD}Usage:{RESET}
-  ne0suite <tool> [args...]
-  ne0suite status
+HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
 
-{BOLD}Tools & Aliases:{RESET}
-  {CYAN}grimoire{RESET}       {DIM}(g){RESET}        Operator toolkit (recon, C2, stego)
-  {CYAN}lightscan{RESET}      {DIM}(ls, scan){RESET} Async network scanner
-  {CYAN}wraith{RESET}         {DIM}(wn, recon){RESET} Attack surface intel
-  {CYAN}shadowci{RESET}       {DIM}(sh){RESET}       CI/CD security scanner
-  {CYAN}akame{RESET}          {DIM}(c2){RESET}       C2 teamserver (Rust)
-  {CYAN}sigil{RESET}          {DIM}(analyze){RESET}  PE/ELF static analyzer (Rust)
-  {CYAN}kira-installer{RESET} {DIM}(install){RESET}  Environment bootstrap
-
-{BOLD}Examples:{RESET}
-  {DIM}${RESET} ne0suite lightscan --scan -t 10.0.0.1
-  {DIM}${RESET} ne0suite wraith scan target.com
-  {DIM}${RESET} ne0suite sigil scan ./malware.exe
-  {DIM}${RESET} ne0suite status
-
-{DIM}Set NE0_DEBUG=1 to print the resolved command before exec.{RESET}
+  {CYAN}grimoire{RESET}   {DIM}g{RESET}          Recon, C2, payloads, stego
+  {CYAN}lightscan{RESET}  {DIM}ls  scan{RESET}   Network scanner
+  {CYAN}wraith{RESET}     {DIM}wn  recon{RESET}  Attack surface intel
+  {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
+  {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
+  {CYAN}sigil{RESET}      {DIM}analyze{RESET}    PE/ELF static analyzer {DIM}(Rust){RESET}
+  {CYAN}kira-installer{RESET} {DIM}install{RESET} Env bootstrap
 """
 
 
