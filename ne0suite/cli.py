@@ -20,6 +20,7 @@ RED = "\033[91m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
 CYAN = "\033[96m"
+GOLD = "\033[38;2;200;160;60m"  # 24-bit, matches the notebook cover
 DIM = "\033[2m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
@@ -76,13 +77,16 @@ def print_banner(animate=True):
 PROJECTS = Path.home() / "dev" / "projects"
 
 # run modes: "bin" = PATH binary (execvp), "cargo" = Rust project,
-# "bash" = shell script project
+# "bash" = shell script project.
+# ver_probe: ("flag", <flag>) probes a PATH binary; ("cargo_meta",) reads
+# Cargo.toml directly; None for tools without a version.
 TOOLS = {
     "grimoire": {
         "cmd":       "grimoire",
         "project":   "grimoire",
         "run":       "bin",
         "desc":      "Unified operator toolkit — recon, payloads, C2, stego, blue team",
+        "ver_probe": ("flag", "--version"),
         "install":   "pip install -e ~/dev/projects/grimoire",
     },
     "lightscan": {
@@ -90,6 +94,7 @@ TOOLS = {
         "project":   "Lightscan",  # capital L - that's how the repo is named
         "run":       "bin",
         "desc":      "Async network scanner — ports, CVEs, scripts, web, brute force",
+        "ver_probe": ("flag", "-v"),
         "install":   "pip install -e ~/dev/projects/Lightscan",
     },
     "wraith": {
@@ -97,6 +102,7 @@ TOOLS = {
         "project":   "wraith-net",
         "run":       "bin",
         "desc":      "Attack surface intel — subdomains, ASN, DNS security, takeover",
+        "ver_probe": ("flag", "version"),
         "install":   "pip install -e ~/dev/projects/wraith-net",
     },
     "shadowci": {
@@ -104,6 +110,7 @@ TOOLS = {
         "project":   "shadowci",
         "run":       "bin",
         "desc":      "CI/CD security scanner — secrets, CVEs, misconfigs",
+        "ver_probe": ("flag", "version"),
         "install":   "pip install -e ~/dev/projects/shadowci",
     },
     "akame": {
@@ -111,6 +118,7 @@ TOOLS = {
         "project":   "akame",
         "run":       "cargo",
         "desc":      "C2 teamserver — operator comms, implant mgmt (Rust)",
+        "ver_probe": ("cargo_meta",),
         "install":   "cd ~/dev/projects/akame && cargo build --release",
     },
     "sigil": {
@@ -118,6 +126,7 @@ TOOLS = {
         "project":   "sigil",
         "run":       "cargo",
         "desc":      "Static PE/ELF binary analyzer — anti-debug, anti-cheat, YARA (Rust)",
+        "ver_probe": ("cargo_meta",),
         "install":   "cd ~/dev/projects/sigil && cargo build --release",
     },
     "kira-installer": {
@@ -125,6 +134,7 @@ TOOLS = {
         "project":   "kira-installer",
         "run":       "bash",
         "desc":      "One-shot environment bootstrap for the full toolchain",
+        "ver_probe": None,  # a script, not a versioned binary
         "install":   "git clone https://github.com/ne0k1r4/kira-installer ~/dev/projects/kira-installer",
     },
 }
@@ -142,6 +152,14 @@ ALIASES = {
     "analyze": "sigil",
     "install": "kira-installer",
 }
+
+# pulled from sigil's clap subcommands in src/main.rs
+SIGIL_SUBCMDS = [
+    "scan", "headers", "strings", "imports", "symbols", "tls",
+    "hashes", "entropy", "antidebug", "anticheat", "disasm",
+    "pattern", "diff", "report", "batch", "overlay", "resources",
+    "clr", "full-disasm", "yara",
+]
 
 HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
 
@@ -182,6 +200,56 @@ def is_installed(tool):
     return False
 
 
+def check_tool(name):
+    """Return (ok, version_string) for one tool."""
+    if not is_installed(name):
+        return False, "not installed"
+
+    info = TOOLS[name]
+    probe = info.get("ver_probe")
+
+    if probe is None:
+        return True, "project found"
+
+    if probe[0] == "cargo_meta":
+        # read Cargo.toml directly instead of invoking cargo for a version
+        toml = project_path(name) / "Cargo.toml"
+        try:
+            for line in toml.read_text().splitlines():
+                if line.strip().startswith("version"):
+                    v = line.split("=")[1].strip().strip('"')
+                    return True, f"v{v}"
+        except Exception:
+            pass
+        rbin = cargo_release_bin(name)
+        if rbin:
+            try:
+                r = subprocess.run([str(rbin), "--version"],
+                                   capture_output=True, text=True, timeout=5)
+                out = (r.stdout + r.stderr).strip()
+                for word in out.split():
+                    if word.startswith("v") and any(c.isdigit() for c in word):
+                        return True, word[:12]
+            except Exception:
+                pass
+        return True, "built"
+
+    if probe[0] == "flag":
+        try:
+            r = subprocess.run([info["cmd"], probe[1]],
+                               capture_output=True, text=True, timeout=5)
+            out = (r.stdout + r.stderr).strip()
+            for line in out.splitlines():
+                for word in line.split():
+                    if word.startswith("v") and any(c.isdigit() for c in word):
+                        return True, word[:12]
+            return True, "installed"
+        except Exception:
+            return True, "installed"
+
+    return True, "installed"
+
+
 def _spinner(msg, duration=0.6):
     """Quick inline spinner while probing the toolchain."""
     if not sys.stdout.isatty():
@@ -207,12 +275,14 @@ def cmd_status():
 
     print(f"  {BOLD}{'TOOL':<16} {'STATUS':<18} {'DESCRIPTION'}{RESET}")
     print(f"  {'─' * 66}")
+
     for name, info in TOOLS.items():
-        ok = is_installed(name)
-        raw = "✔ installed" if ok else "✗ missing"
+        ok, ver = check_tool(name)
+        raw = f"✔ {ver}" if ok else "✗ missing"
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
         print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}")
+
     print()
 
 
@@ -230,8 +300,12 @@ def cmd_dispatch(tool, args):
         info = TOOLS[tool]
         print(f"\n  {RED}[!]{RESET} {BOLD}{tool}{RESET} is not installed\n")
         print(f"  {DIM}expected:  {project_path(tool)}{RESET}")
+        if info.get("cmd"):
+            print(f"  {DIM}or PATH:   {info['cmd']}{RESET}")
         print(f"\n  {BOLD}install:{RESET}")
-        print(f"  {YELLOW}${RESET}  {info['install']}\n")
+        print(f"  {GOLD}${RESET}  {info['install']}\n")
+        if tool == "sigil":
+            print(f"  {DIM}subcommands: {', '.join(SIGIL_SUBCMDS)}{RESET}\n")
         sys.exit(1)
 
     info = TOOLS[tool]
@@ -245,15 +319,26 @@ def cmd_dispatch(tool, args):
         os.execvp(info["cmd"], [info["cmd"]] + args)
 
     elif info["run"] == "cargo":
-        rbin = cargo_release_bin(tool)
-        if rbin:
-            os.execvp(str(rbin), [str(rbin)] + args)
-        else:
-            # no built binary yet - build and run via cargo (slow first time)
-            print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
+        if tool == "sigil":
+            # PATH first, then the release binary, then cargo run
+            if shutil.which("sigil"):
+                os.execvp("sigil", ["sigil"] + args)
+            rbin = cargo_release_bin("sigil")
+            if rbin:
+                os.execvp(str(rbin), [str(rbin)] + args)
+            print(f"  {YELLOW}[!]{RESET} sigil not built yet, running via cargo "
                   f"(this will take a minute)", file=sys.stderr)
             result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
             sys.exit(result.returncode)
+        else:
+            rbin = cargo_release_bin(tool)
+            if rbin:
+                os.execvp(str(rbin), [str(rbin)] + args)
+            else:
+                print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
+                      f"(this will take a minute)", file=sys.stderr)
+                result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+                sys.exit(result.returncode)
 
     elif info["run"] == "bash":
         result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
