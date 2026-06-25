@@ -2,6 +2,7 @@ import sys
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 VERSION = "1.2.0"
@@ -16,15 +17,54 @@ DIM    = "\033[2m"
 BOLD   = "\033[1m"
 RESET  = "\033[0m"
 
-BANNER = f"""
-{RED}{BOLD}  ███╗   ██╗███████╗ ██████╗ ███████╗██╗   ██╗██╗████████╗███████╗
-  ████╗  ██║██╔════╝██╔═══██╗██╔════╝██║   ██║██║╚══██╔══╝██╔════╝
-  ██╔██╗ ██║█████╗  ██║   ██║███████╗██║   ██║██║   ██║   █████╗
-  ██║╚██╗██║██╔══╝  ██║   ██║╚════██║██║   ██║██║   ██║   ██╔══╝
-  ██║ ╚████║███████╗╚██████╔╝███████║╚██████╔╝██║   ██║   ███████╗
-  ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝{RESET}
-  {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}
-"""
+# banner lines stored separately for the animated reveal
+BANNER_ART = [
+    "  ███╗   ██╗███████╗ ██████╗ ███████╗██╗   ██╗██╗████████╗███████╗",
+    "  ████╗  ██║██╔════╝██╔═══██╗██╔════╝██║   ██║██║╚══██╔══╝██╔════╝",
+    "  ██╔██╗ ██║█████╗  ██║   ██║███████╗██║   ██║██║   ██║   █████╗  ",
+    "  ██║╚██╗██║██╔══╝  ██║   ██║╚════██║██║   ██║██║   ██║   ██╔══╝  ",
+    "  ██║ ╚████║███████╗╚██████╔╝███████║╚██████╔╝██║   ██║   ███████╗",
+    "  ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝",
+]
+
+# red gradient — dark to bright across the 6 banner lines
+BANNER_GRADIENT = [
+    "\033[38;2;120;20;20m",  # deep crimson
+    "\033[38;2;160;25;25m",
+    "\033[38;2;200;35;35m",
+    "\033[38;2;220;50;50m",
+    "\033[38;2;240;70;70m",
+    "\033[38;2;255;90;90m",  # bright red
+]
+
+TAGLINE = f"  {DIM}Unified Operator Suite · by Light (Neok1ra) · v{VERSION}{RESET}"
+SEPARATOR = f"  {DIM}{'─' * 66}{RESET}"
+
+
+def print_banner(animate=True):
+    """Print the ne0suite ASCII banner with optional line-by-line gradient animation."""
+    print()
+    if animate and sys.stdout.isatty():
+        for i, line in enumerate(BANNER_ART):
+            color = BANNER_GRADIENT[i]
+            sys.stdout.write(f"{BOLD}{color}{line}{RESET}\n")
+            sys.stdout.flush()
+            time.sleep(0.04)
+        time.sleep(0.08)
+        # tagline typed out character by character
+        tagline_raw = f"  Unified Operator Suite · by Light (Neok1ra) · v{VERSION}"
+        for ch in tagline_raw:
+            sys.stdout.write(f"{DIM}{ch}{RESET}")
+            sys.stdout.flush()
+            time.sleep(0.008)
+        print()
+    else:
+        # non-interactive / piped — skip animation, just dump it
+        for i, line in enumerate(BANNER_ART):
+            print(f"{BOLD}{BANNER_GRADIENT[i]}{line}{RESET}")
+        print(TAGLINE)
+    print(SEPARATOR)
+    print()
 
 # all tools live under ~/dev/projects/ — change this if your layout differs
 PROJECTS = Path.home() / "dev" / "projects"
@@ -123,19 +163,19 @@ HELP = f"""
   ne0suite status
 
 {BOLD}Tools & Aliases:{RESET}
-  {CYAN}grimoire{RESET}       (g)       {DIM}Operator toolkit (recon, C2, stego){RESET}
-  {CYAN}lightscan{RESET}      (ls, scan){DIM}Async network scanner{RESET}
-  {CYAN}wraith{RESET}         (wn, recon){DIM}Attack surface intel{RESET}
-  {CYAN}shadowci{RESET}       (sh)      {DIM}CI/CD security scanner{RESET}
-  {CYAN}akame{RESET}          (c2)      {DIM}C2 teamserver (Rust){RESET}
-  {CYAN}sigil{RESET}          (analyze) {DIM}PE/ELF static analyzer (Rust){RESET}
-  {CYAN}kira-installer{RESET} (install) {DIM}Environment bootstrap installer{RESET}
+  {CYAN}grimoire{RESET}       {DIM}(g){RESET}        Operator toolkit (recon, C2, stego)
+  {CYAN}lightscan{RESET}      {DIM}(ls, scan){RESET} Async network scanner
+  {CYAN}wraith{RESET}         {DIM}(wn, recon){RESET} Attack surface intel
+  {CYAN}shadowci{RESET}       {DIM}(sh){RESET}       CI/CD security scanner
+  {CYAN}akame{RESET}          {DIM}(c2){RESET}       C2 teamserver (Rust)
+  {CYAN}sigil{RESET}          {DIM}(analyze){RESET}  PE/ELF static analyzer (Rust)
+  {CYAN}kira-installer{RESET} {DIM}(install){RESET}  Environment bootstrap
 
 {BOLD}Examples:{RESET}
-  ne0suite lightscan --scan -t 10.0.0.1
-  ne0suite wraith scan target.com
-  ne0suite sigil scan ./malware.exe
-  ne0suite status
+  {DIM}${RESET} ne0suite lightscan --scan -t 10.0.0.1
+  {DIM}${RESET} ne0suite wraith scan target.com
+  {DIM}${RESET} ne0suite sigil scan ./malware.exe
+  {DIM}${RESET} ne0suite status
 
 {DIM}Set NE0_DEBUG=1 to print the resolved command before exec.{RESET}
 """
@@ -229,21 +269,48 @@ def check_tool(name):
     return True, "installed"
 
 
+def _spinner(msg, duration=0.6):
+    """Quick inline spinner — gives visual feedback while probing tools."""
+    if not sys.stdout.isatty():
+        print(f"  {msg}")
+        return
+    frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+    end_time = time.monotonic() + duration
+    i = 0
+    while time.monotonic() < end_time:
+        sys.stdout.write(f"\r  {RED}{frames[i % len(frames)]}{RESET} {msg}")
+        sys.stdout.flush()
+        time.sleep(0.06)
+        i += 1
+    sys.stdout.write(f"\r  {GREEN}✔{RESET} {msg}\n")
+    sys.stdout.flush()
+
+
 def cmd_status():
-    print(BANNER)
-    print(f"  {BOLD}Tool Status{RESET}\n")
-    print(f"  {'TOOL':<16} {'STATUS':<20} {'DESCRIPTION'}")
-    print(f"  {'─' * 70}")
+    print_banner()
+
+    _spinner("Scanning toolchain...", 0.5)
+    print()
+
+    print(f"  {BOLD}{'TOOL':<16} {'STATUS':<18} {'DESCRIPTION'}{RESET}")
+    print(f"  {'─' * 66}")
 
     for name, info in TOOLS.items():
         ok, ver = check_tool(name)
         raw = f"✔ {ver}" if ok else "✗ missing"
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
-        print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:44]}{RESET}")
+        line = f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}"
+        if sys.stdout.isatty():
+            # fade-in each row
+            sys.stdout.write(f"{line}\n")
+            sys.stdout.flush()
+            time.sleep(0.05)
+        else:
+            print(line)
 
-    # quick sanity check for tools that need config files to work properly
-    print(f"\n  {DIM}Config locations:{RESET}")
+    # config file check
+    print(f"\n  {DIM}Config:{RESET}")
     for label, path in [("GRIMOIRE", "~/.grimoire/config.json"),
                         ("WRAITH-NET", "~/.wraith-net/config.json")]:
         full = Path(path.replace("~", str(Path.home())))
@@ -342,7 +409,7 @@ def main():
 
     # no args at all — just show the help, don't error
     if not args or args[0] in ("-h", "--help", "help"):
-        print(BANNER)
+        print_banner()
         print(HELP)
         sys.exit(0)
 
