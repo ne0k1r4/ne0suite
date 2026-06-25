@@ -278,7 +278,14 @@ def cmd_status():
         raw = f"✔ {ver}" if ok else "✗ missing"
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
-        print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}")
+        line = f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}"
+        if sys.stdout.isatty():
+            # fade each row in one at a time, feels less like a wall of text
+            sys.stdout.write(f"{line}\n")
+            sys.stdout.flush()
+            time.sleep(0.05)
+        else:
+            print(line)
 
     print()
 
