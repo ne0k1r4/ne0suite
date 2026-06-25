@@ -163,13 +163,10 @@ SIGIL_SUBCMDS = [
 
 HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
 
-  {CYAN}grimoire{RESET}   {DIM}g{RESET}          Recon, C2, payloads, stego
-  {CYAN}lightscan{RESET}  {DIM}ls  scan{RESET}   Network scanner
-  {CYAN}wraith{RESET}     {DIM}wn  recon{RESET}  Attack surface intel
-  {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
-  {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
-  {CYAN}sigil{RESET}      {DIM}analyze{RESET}    PE/ELF static analyzer {DIM}(Rust){RESET}
-  {CYAN}kira-installer{RESET} {DIM}install{RESET} Env bootstrap
+  {CYAN}grimoire{RESET} {DIM}g{RESET}          ·  {CYAN}lightscan{RESET} {DIM}ls  scan{RESET}
+  {CYAN}wraith{RESET} {DIM}wn  recon{RESET}    ·  {CYAN}shadowci{RESET} {DIM}sh{RESET}
+  {CYAN}akame{RESET} {DIM}c2{RESET}            ·  {CYAN}sigil{RESET} {DIM}analyze{RESET}
+  {CYAN}kira-installer{RESET} {DIM}install{RESET}
 """
 
 
