@@ -25,13 +25,13 @@ cd ne0suite
 ./install.sh
 ```
 
-The script performs an editable pip install and creates the template config
-directories for the tools that need API keys.
+The script performs an editable pip install, creates the template config
+directories, and wires up shell aliases (`g`, `ls`, `wn`, `sh`, `n0s`).
 
 ## Usage
 
 ```bash
-# check installation
+# check installation and versions
 ne0suite status
 
 # dispatch
@@ -41,9 +41,9 @@ ne0suite grimoire sentinel --ioc 1.2.3.4
 ne0suite shadowci scan /path/to/repo
 ```
 
-Short aliases are resolved before dispatch: `g` → grimoire, `ls`/`scan` →
-lightscan, `wn`/`recon` → wraith, `sh`/`shadow` → shadowci, `c2` → akame,
-`analyze` → sigil, `install` → kira-installer.
+`status` probes each tool for its version (via its version flag, or straight
+out of `Cargo.toml` for the Rust tools) instead of just reporting
+installed/missing.
 
 Set `NE0_DEBUG=1` to have ne0suite print the exact command it is about to run
 instead of just running it — useful when something misbehaves.
@@ -58,6 +58,9 @@ files created during installation:
 
 ## Release notes
 
+**v1.0.0** — animated gradient banner, `ne0suite status` with per-tool version
+probing and a spinner, sigil/akame cargo resolution, kira-installer bash
+dispatch.
+
 **v0.1.0** — first working dispatcher: tool registry, alias resolution,
-subprocess passthrough (PATH binaries, cargo release binaries, shell scripts),
-`ne0suite status`.
+subprocess passthrough, `ne0suite status`.
