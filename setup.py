@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ne0suite",
-    version="0.1.0",
+    version="1.0.0",
     description="Unified Operator CLI — GRIMOIRE · LightScan · WRAITH-NET · ShadowCI · akame · sigil",
     author="Light",
     author_email="neok1ra@proton.me",
