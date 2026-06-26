@@ -5,17 +5,17 @@ import subprocess
 import time
 from pathlib import Path
 
-VERSION = "1.2.0"
+VERSION = "1.2.0"  # TODO: read this from setup.py instead
 
 # raw ANSI — no deps, works everywhere, respects the terminal
-RED    = "\033[91m"
-GREEN  = "\033[92m"
+RED = "\033[91m"
+GREEN = "\033[92m"
 YELLOW = "\033[93m"
-CYAN   = "\033[96m"
-GOLD   = "\033[38;2;200;160;60m"  # 24-bit, matches the DN notebook cover
-DIM    = "\033[2m"
-BOLD   = "\033[1m"
-RESET  = "\033[0m"
+CYAN = "\033[96m"
+GOLD = "\033[38;2;200;160;60m"  # 24-bit, matches the DN notebook cover
+DIM = "\033[2m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
 
 # banner lines stored separately for the animated reveal
 BANNER_ART = [
@@ -27,7 +27,7 @@ BANNER_ART = [
     "  ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝",
 ]
 
-# red gradient — dark to bright across the 6 banner lines
+# computed these by hand, dark crimson to bright red across 6 lines
 BANNER_GRADIENT = [
     "\033[38;2;120;20;20m",  # deep crimson
     "\033[38;2;160;25;25m",
@@ -408,6 +408,8 @@ def main():
     if args[0] == "status":
         cmd_status()
         sys.exit(0)
+
+    # TODO: add --list flag to show all installed tools without launching
 
     cmd_dispatch(args[0].lower(), args[1:])
 
