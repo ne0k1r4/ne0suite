@@ -25,6 +25,11 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+try:
+    import readline
+except ImportError:  # windows / minimal pythons
+    readline = None
+
 VERSION = "1.0.0"
 
 # runtime state lives under ~/.ne0suite so uninstalling leaves nothing behind
@@ -443,14 +448,26 @@ def cmd_check():
 class Ne0Console:
     """Interactive shell around the dispatcher.
 
-    Keeps a `target` variable that gets substituted into $TARGET / $t in
-    arguments so you can run several tools against the same host without
-    retyping it.
+    Tab-completes tool names, aliases and builtin commands, and keeps a
+    `target` variable that gets substituted into $TARGET / $t in arguments
+    so you can run several tools against the same host without retyping it.
     """
 
     def __init__(self):
         self.target = ""
         self.prompt = f"{RED}ne0suite{RESET} > "
+        self.commands = sorted(list(TOOLS.keys()) + list(ALIASES.keys()) + [
+            "status", "history", "check", "target", "help", "exit", "quit"
+        ])
+        if readline:
+            readline.set_completer(self.complete)
+            readline.parse_and_bind("tab: complete")
+
+    def complete(self, text, state):
+        options = [cmd for cmd in self.commands if cmd.startswith(text)]
+        if state < len(options):
+            return options[state]
+        return None
 
     def run(self):
         print_banner(animate=False)
