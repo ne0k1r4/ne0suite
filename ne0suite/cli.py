@@ -31,7 +31,7 @@ try:
 except ImportError:  # windows / minimal pythons
     readline = None
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 
 # runtime state lives under ~/.ne0suite so uninstalling leaves nothing behind
 NE0_DIR = Path.home() / ".ne0suite"
