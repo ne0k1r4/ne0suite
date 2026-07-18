@@ -376,6 +376,22 @@ def cmd_check():
         status = f"{GREEN}✔ found{RESET}" if path else f"{YELLOW}✗ missing{RESET}"
         line = f"  {CYAN}{binary:<16}{RESET} {status:<24} {DIM}{desc}{RESET}"
         print(line)
+
+    print(f"\n  {BOLD}{'CONFIGURATION FILE':<32} {'STATUS'}{RESET}")
+    print(f"  {'─' * 66}")
+    for label, path in [("GRIMOIRE", "~/.grimoire/config.json"),
+                        ("WRAITH-NET", "~/.wraith-net/config.json")]:
+        full = Path(path.replace("~", str(Path.home())))
+        if not full.exists():
+            status = f"{YELLOW}✗ missing{RESET}"
+        else:
+            try:
+                with open(full, "r") as f:
+                    json.load(f)
+                status = f"{GREEN}✔ valid{RESET}"
+            except Exception:
+                status = f"{RED}✗ invalid JSON{RESET}"
+        print(f"  {label:<32} {status}")
     print()
 
 
