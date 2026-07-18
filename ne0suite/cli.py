@@ -361,33 +361,47 @@ def cmd_dispatch(tool, args):
               file=sys.stderr)
 
     if info["run"] == "bin":
+        HistoryManager.log_event(tool, args, 0.0, 0)
         os.execvp(info["cmd"], [info["cmd"]] + args)
+
 
     elif info["run"] == "cargo":
         if tool == "sigil":
             # PATH first, then the release binary, then cargo run
             if shutil.which("sigil"):
+                HistoryManager.log_event(tool, args, 0.0, 0)
                 os.execvp("sigil", ["sigil"] + args)
             rbin = cargo_release_bin("sigil")
             if rbin:
+                HistoryManager.log_event(tool, args, 0.0, 0)
                 os.execvp(str(rbin), [str(rbin)] + args)
             print(f"  {YELLOW}[!]{RESET} sigil not built yet, running via cargo "
                   f"(this will take a minute)", file=sys.stderr)
+            start = time.monotonic()
             result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+            HistoryManager.log_event(tool, args, time.monotonic() - start, result.returncode)
             sys.exit(result.returncode)
+
         else:
             rbin = cargo_release_bin(tool)
             if rbin:
+                HistoryManager.log_event(tool, args, 0.0, 0)
                 os.execvp(str(rbin), [str(rbin)] + args)
             else:
                 print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
                       f"(this will take a minute)", file=sys.stderr)
+                start = time.monotonic()
                 result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+                HistoryManager.log_event(tool, args, time.monotonic() - start, result.returncode)
                 sys.exit(result.returncode)
 
+
     elif info["run"] == "bash":
+        start = time.monotonic()
         result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
+        HistoryManager.log_event(tool, args, time.monotonic() - start, result.returncode)
         sys.exit(result.returncode)
+
 
 
 def main():
