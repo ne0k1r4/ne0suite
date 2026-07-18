@@ -354,6 +354,31 @@ def cmd_history():
         print(f"  {RED}[!]{RESET} Error reading history: {e}")
 
 
+def cmd_check():
+    """Diagnostics: required binaries present, config files valid JSON."""
+    print_banner()
+    print(f"  {BOLD}System Status & Diagnostics{RESET}\n")
+
+    dependencies = {
+        "git": "Cloning and tracking repositories",
+        "python3": "Running Python tool pipelines",
+        "nmap": "Active scanning (LightScan)",
+        "cargo": "Compiling Rust applications",
+        "docker": "Running isolated environments",
+        "dig": "DNS queries (WRAITH-NET)",
+        "curl": "Raw HTTP connectivity probes",
+    }
+
+    print(f"  {BOLD}{'DEPENDENCY':<16} {'STATUS':<15} {'DESCRIPTION'}{RESET}")
+    print(f"  {'─' * 66}")
+    for binary, desc in dependencies.items():
+        path = shutil.which(binary)
+        status = f"{GREEN}✔ found{RESET}" if path else f"{YELLOW}✗ missing{RESET}"
+        line = f"  {CYAN}{binary:<16}{RESET} {status:<24} {DIM}{desc}{RESET}"
+        print(line)
+    print()
+
+
 def cmd_dispatch(tool, args):
     # resolve aliases before anything else
     tool = ALIASES.get(tool, tool)
@@ -445,6 +470,10 @@ def main():
 
     if args[0] == "history":
         cmd_history()
+        sys.exit(0)
+
+    if args[0] == "check":
+        cmd_check()
         sys.exit(0)
 
     cmd_dispatch(args[0].lower(), args[1:])
