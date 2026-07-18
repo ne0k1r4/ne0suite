@@ -331,6 +331,29 @@ def cmd_status():
     print()
 
 
+def cmd_history():
+    """Show the last few dispatched runs from ~/.ne0suite/history.json."""
+    HistoryManager.init_db()
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            data = json.load(f)
+        if not data:
+            print(f"  {YELLOW}No execution history found.{RESET}")
+            return
+        print(f"\n  {BOLD}Execution History (Last 20 Runs){RESET}\n")
+        print(f"  {'TIME':<20} {'TOOL':<12} {'DURATION':<10} {'STATUS':<10} {'ARGUMENTS'}")
+        print(f"  {'─' * 76}")
+        for event in reversed(data[-20:]):
+            dt = datetime.fromisoformat(event["timestamp"]).strftime("%Y-%m-%d %H:%M:%S")
+            status = f"{GREEN}✔ OK{RESET}" if event["exit_code"] == 0 else f"{RED}✗ ERR{RESET}"
+            args_str = " ".join(event["args"])[:35]
+            print(f"  {dt:<20} {CYAN}{event['tool']:<12}{RESET} "
+                  f"{event['duration_seconds']:<10.2f}s {status:<18} {DIM}{args_str}{RESET}")
+        print()
+    except Exception as e:
+        print(f"  {RED}[!]{RESET} Error reading history: {e}")
+
+
 def cmd_dispatch(tool, args):
     # resolve aliases before anything else
     tool = ALIASES.get(tool, tool)
@@ -418,6 +441,10 @@ def main():
 
     if args[0] == "status":
         cmd_status()
+        sys.exit(0)
+
+    if args[0] == "history":
+        cmd_history()
         sys.exit(0)
 
     cmd_dispatch(args[0].lower(), args[1:])
