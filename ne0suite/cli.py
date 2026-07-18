@@ -6,14 +6,33 @@ invoked, its own version flag, and its own way of being installed. This
 dispatcher exists so i don't have to remember any of that.
 """
 
+import json
 import os
 import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 VERSION = "1.0.0"
+
+# runtime state lives under ~/.ne0suite so uninstalling leaves nothing behind
+NE0_DIR = Path.home() / ".ne0suite"
+HISTORY_FILE = NE0_DIR / "history.json"
+CONFIG_FILE = NE0_DIR / "config.json"
+
+
+class HistoryManager:
+    """Tiny json-backed log of everything dispatched through ne0suite."""
+
+    @staticmethod
+    def init_db():
+        """Make sure the state directory and history file exist."""
+        NE0_DIR.mkdir(parents=True, exist_ok=True)
+        if not HISTORY_FILE.exists():
+            with open(HISTORY_FILE, "w") as f:
+                json.dump([], f)
 
 # raw ANSI, zero deps, works in any terminal that isn't ancient
 RED = "\033[91m"
@@ -163,10 +182,13 @@ SIGIL_SUBCMDS = [
 
 HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
 
-  {CYAN}grimoire{RESET} {DIM}g{RESET}          ·  {CYAN}lightscan{RESET} {DIM}ls  scan{RESET}
-  {CYAN}wraith{RESET} {DIM}wn  recon{RESET}    ·  {CYAN}shadowci{RESET} {DIM}sh{RESET}
-  {CYAN}akame{RESET} {DIM}c2{RESET}            ·  {CYAN}sigil{RESET} {DIM}analyze{RESET}
-  {CYAN}kira-installer{RESET} {DIM}install{RESET}
+  {CYAN}grimoire{RESET}   {DIM}g{RESET}          Recon, C2, payloads, stego
+  {CYAN}lightscan{RESET}  {DIM}ls  scan{RESET}   Network scanner
+  {CYAN}wraith{RESET}     {DIM}wn  recon{RESET}  Attack surface intel
+  {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
+  {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
+  {CYAN}sigil{RESET}      {DIM}analyze{RESET}    PE/ELF static analyzer {DIM}(Rust){RESET}
+  {CYAN}kira-installer{RESET} {DIM}install{RESET} Env bootstrap
 """
 
 
@@ -278,14 +300,7 @@ def cmd_status():
         raw = f"✔ {ver}" if ok else "✗ missing"
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
-        line = f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}"
-        if sys.stdout.isatty():
-            # fade each row in one at a time, feels less like a wall of text
-            sys.stdout.write(f"{line}\n")
-            sys.stdout.flush()
-            time.sleep(0.05)
-        else:
-            print(line)
+        print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}")
 
     print()
 
