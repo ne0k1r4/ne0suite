@@ -8,6 +8,7 @@ while I stopped remembering which one needed `--version` and which one needed
 
     ne0suite <tool> [args...]     run a tool
     ne0suite status               show what's installed and what isn't
+    ne0suite console              interactive shell with tab completion
     ne0suite history              last tool invocations, timings and exits
     ne0suite check                dependency / config diagnostics
 
@@ -667,6 +668,11 @@ def main():
 
     if args[0] == "status":
         cmd_status()
+        sys.exit(0)
+
+    if args[0] == "console":
+        shell = Ne0Console()
+        shell.run()
         sys.exit(0)
 
     if args[0] == "history":
