@@ -34,6 +34,32 @@ class HistoryManager:
             with open(HISTORY_FILE, "w") as f:
                 json.dump([], f)
 
+    @staticmethod
+    def log_event(tool, args, duration, exit_code):
+        """Append one run to the history file.
+
+        Best effort - if the file is corrupt or unreadable we just don't
+        record this one, no point crashing a dispatch over bookkeeping.
+        """
+        HistoryManager.init_db()
+        event = {
+            "timestamp": datetime.now().isoformat(),
+            "tool": tool,
+            "args": args,
+            "duration_seconds": round(duration, 3),
+            "exit_code": exit_code,
+        }
+        try:
+            with open(HISTORY_FILE, "r+") as f:
+                data = json.load(f)
+                data.append(event)
+                f.seek(0)
+                json.dump(data, f, indent=2)
+                f.truncate()
+        except Exception:
+            pass
+
+
 # raw ANSI, zero deps, works in any terminal that isn't ancient
 RED = "\033[91m"
 GREEN = "\033[92m"
