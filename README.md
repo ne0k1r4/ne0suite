@@ -39,11 +39,22 @@ ne0suite wraith scan target.com
 ne0suite lightscan --scan -t 10.0.0.1 -p top100 --sv --cve
 ne0suite grimoire sentinel --ioc 1.2.3.4
 ne0suite shadowci scan /path/to/repo
+
+# interactive shell with tab completion
+ne0suite console
 ```
 
 `status` probes each tool for its version (via its version flag, or straight
 out of `Cargo.toml` for the Rust tools) instead of just reporting
 installed/missing.
+
+### Console
+
+`ne0suite console` drops into an interactive shell. `target <host>` sets a
+target that gets substituted into `$TARGET`/`$t` in later commands, so you can
+run several tools against the same host without retyping it. `history` shows
+the last 20 dispatches (tool, duration, exit status); `check` verifies system
+binaries and config file validity.
 
 Set `NE0_DEBUG=1` to have ne0suite print the exact command it is about to run
 instead of just running it — useful when something misbehaves.
@@ -57,6 +68,10 @@ files created during installation:
 * `~/.wraith-net/config.json`
 
 ## Release notes
+
+**v1.2.0** — `ne0suite console` (readline tab completion, `target` variable),
+`ne0suite history`, `ne0suite check`. All dispatches are logged to
+`~/.ne0suite/history.json`.
 
 **v1.0.0** — animated gradient banner, `ne0suite status` with per-tool version
 probing and a spinner, sigil/akame cargo resolution, kira-installer bash
