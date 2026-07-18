@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
-"""ne0suite - one entry point for the toolchain.
+"""ne0suite - one entry point for the whole toolchain.
 
-Every tool i've written ends up in ~/dev/projects with its own way of being
-invoked, its own version flag, and its own way of being installed. This
-dispatcher exists so i don't have to remember any of that.
+Every security tool I've written lives in ~/dev/projects, each with its own
+invocation, its own version flag, and its own way of being installed. After a
+while I stopped remembering which one needed `--version` and which one needed
+`version`, so this dispatcher exists to forget all of that for me.
+
+    ne0suite <tool> [args...]     run a tool
+    ne0suite status               show what's installed and what isn't
+    ne0suite history              last tool invocations, timings and exits
+    ne0suite check                dependency / config diagnostics
+
+Tools that don't land on PATH (the Rust ones, mostly) get resolved through
+their release binaries or a cargo run fallback, so dispatching never depends
+on how a tool happened to be installed.
 """
 
-import json
+import sys
 import os
 import shutil
 import subprocess
-import sys
 import time
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -65,11 +75,12 @@ RED = "\033[91m"
 GREEN = "\033[92m"
 YELLOW = "\033[93m"
 CYAN = "\033[96m"
-GOLD = "\033[38;2;200;160;60m"  # 24-bit, matches the notebook cover
+GOLD = "\033[38;2;200;160;60m"  # 24-bit color, matches the notebook cover
 DIM = "\033[2m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
+# banner lines live separately so the animated reveal can print them one at a time
 BANNER_ART = [
     "  ███╗   ██╗███████╗ ██████╗ ███████╗██╗   ██╗██╗████████╗███████╗",
     "  ████╗  ██║██╔════╝██╔═══██╗██╔════╝██║   ██║██║╚══██╔══╝██╔════╝",
@@ -94,7 +105,8 @@ SEPARATOR = f"  {DIM}{'─' * 66}{RESET}"
 
 
 def print_banner(animate=True):
-    """Line-by-line gradient reveal when stdout is a tty, plain dump otherwise."""
+    """Print the banner. When stdout is a tty, reveal it line by line and
+    type the tagline out - it's stupid, but it's *our* stupid."""
     print()
     if animate and sys.stdout.isatty():
         for i, line in enumerate(BANNER_ART):
@@ -103,7 +115,6 @@ def print_banner(animate=True):
             sys.stdout.flush()
             time.sleep(0.04)
         time.sleep(0.08)
-        # tagline typed out character by character
         tagline_raw = f"  Unified Operator Suite · by Light (Neok1ra) · v{VERSION}"
         for ch in tagline_raw:
             sys.stdout.write(f"{DIM}{ch}{RESET}")
@@ -111,6 +122,7 @@ def print_banner(animate=True):
             time.sleep(0.008)
         print()
     else:
+        # piped output - skip the theatrics, just dump it
         for i, line in enumerate(BANNER_ART):
             print(f"{BOLD}{BANNER_GRADIENT[i]}{line}{RESET}")
         print(TAGLINE)
@@ -118,13 +130,16 @@ def print_banner(animate=True):
     print()
 
 
-# all tools live under ~/dev/projects/ - change this if your layout differs
+# everything lives under ~/dev/projects - change this if your layout differs
 PROJECTS = Path.home() / "dev" / "projects"
 
-# run modes: "bin" = PATH binary (execvp), "cargo" = Rust project,
-# "bash" = shell script project.
-# ver_probe: ("flag", <flag>) probes a PATH binary; ("cargo_meta",) reads
-# Cargo.toml directly; None for tools without a version.
+# one entry per tool. run modes:
+#   "bin"    - a PATH binary (execvp)
+#   "cargo"  - a Rust project, resolved via release binary or cargo run
+#   "bash"   - a shell script project
+# ver_probe tells status how to scrape a version string:
+#   ("flag", <flag>)   run the binary with this flag and scan the output
+#   ("cargo_meta",)    read version straight out of Cargo.toml (no build)
 TOOLS = {
     "grimoire": {
         "cmd":       "grimoire",
@@ -143,7 +158,7 @@ TOOLS = {
         "install":   "pip install -e ~/dev/projects/Lightscan",
     },
     "wraith": {
-        "cmd":       "wraith",
+        "cmd":       "wraith-net",  # binary name differs from the subcommand key
         "project":   "wraith-net",
         "run":       "bin",
         "desc":      "Attack surface intel — subdomains, ASN, DNS security, takeover",
@@ -166,6 +181,8 @@ TOOLS = {
         "ver_probe": ("cargo_meta",),
         "install":   "cd ~/dev/projects/akame && cargo build --release",
     },
+    # sigil ships a release binary like akame, but it's PATH-installable so
+    # cmd is set. resolution order: PATH -> target/release/sigil -> cargo run.
     "sigil": {
         "cmd":       "sigil",
         "project":   "sigil",
@@ -206,7 +223,7 @@ SIGIL_SUBCMDS = [
     "clr", "full-disasm", "yara",
 ]
 
-HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  help{RESET}
+HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  console  |  history  |  check  |  help{RESET}
 
   {CYAN}grimoire{RESET}   {DIM}g{RESET}          Recon, C2, payloads, stego
   {CYAN}lightscan{RESET}  {DIM}ls  scan{RESET}   Network scanner
@@ -223,7 +240,10 @@ def project_path(tool):
 
 
 def cargo_release_bin(tool):
-    # check if the project has already been built - avoids triggering cargo
+    """Existing release binary for a cargo tool, if any.
+
+    Checking first avoids triggering a cargo build every time you dispatch.
+    """
     pdir = project_path(tool)
     name = TOOLS[tool].get("cmd") or tool
     bin_path = pdir / "target" / "release" / name
@@ -232,16 +252,24 @@ def cargo_release_bin(tool):
 
 def is_installed(tool):
     info = TOOLS[tool]
+
     if info["run"] == "bin":
+        # for the python tools this is just "did the entry point land on PATH"
         return bool(shutil.which(info["cmd"]))
+
     if info["run"] == "cargo":
+        # a project dir alone doesn't mean installed - it has to be buildable
         if info.get("cmd") and shutil.which(info["cmd"]):
             return True
         if cargo_release_bin(tool):
             return True
+        # last resort: dir exists, cargo run will build it on first dispatch
         return project_path(tool).exists()
+
     if info["run"] == "bash":
+        # kira-installer just needs the repo cloned; install.sh does the rest
         return project_path(tool).exists()
+
     return False
 
 
@@ -254,6 +282,7 @@ def check_tool(name):
     probe = info.get("ver_probe")
 
     if probe is None:
+        # bash tools have no version to speak of - presence is enough
         return True, "project found"
 
     if probe[0] == "cargo_meta":
@@ -266,6 +295,7 @@ def check_tool(name):
                     return True, f"v{v}"
         except Exception:
             pass
+        # no Cargo.toml, or it didn't parse - fall back to the binary itself
         rbin = cargo_release_bin(name)
         if rbin:
             try:
@@ -280,6 +310,7 @@ def check_tool(name):
         return True, "built"
 
     if probe[0] == "flag":
+        # run the binary with its version flag and scrape the output
         try:
             r = subprocess.run([info["cmd"], probe[1]],
                                capture_output=True, text=True, timeout=5)
@@ -326,8 +357,22 @@ def cmd_status():
         raw = f"✔ {ver}" if ok else "✗ missing"
         color = GREEN if ok else YELLOW
         padded = f"{color}{raw:<18}{RESET}"
-        print(f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}")
+        line = f"  {CYAN}{name:<16}{RESET} {padded} {DIM}{info['desc'][:40]}{RESET}"
+        if sys.stdout.isatty():
+            # fade each row in one at a time, feels less like a wall of text
+            sys.stdout.write(f"{line}\n")
+            sys.stdout.flush()
+            time.sleep(0.05)
+        else:
+            print(line)
 
+    print(f"\n  {DIM}Config:{RESET}")
+    for label, path in [("GRIMOIRE", "~/.grimoire/config.json"),
+                        ("WRAITH-NET", "~/.wraith-net/config.json")]:
+        full = Path(path.replace("~", str(Path.home())))
+        color = GREEN if full.exists() else DIM
+        mark = "✔" if full.exists() else "✗"
+        print(f"  {color}{mark}{RESET}  {label:<14} {DIM}{path}{RESET}")
     print()
 
 
@@ -395,7 +440,77 @@ def cmd_check():
     print()
 
 
-def cmd_dispatch(tool, args):
+class Ne0Console:
+    """Interactive shell around the dispatcher.
+
+    Keeps a `target` variable that gets substituted into $TARGET / $t in
+    arguments so you can run several tools against the same host without
+    retyping it.
+    """
+
+    def __init__(self):
+        self.target = ""
+        self.prompt = f"{RED}ne0suite{RESET} > "
+
+    def run(self):
+        print_banner(animate=False)
+        print(f"  {BOLD}Console Session Started.{RESET} Type {CYAN}help{RESET} or {CYAN}exit{RESET} to close.\n")
+        while True:
+            prefix = f" [{GOLD}{self.target}{RESET}]" if self.target else ""
+            self.prompt = f"{RED}ne0suite{prefix}{RESET} > "
+            try:
+                line = input(self.prompt).strip()
+            except (KeyboardInterrupt, EOFError):
+                print("\n  Closing console session.")
+                break
+            if not line:
+                continue
+            parts = line.split()
+            cmd, args = parts[0].lower(), parts[1:]
+            self.execute(cmd, args)
+
+    def execute(self, cmd, args):
+        if cmd in ("exit", "quit"):
+            raise KeyboardInterrupt
+        elif cmd == "help":
+            print(HELP)
+        elif cmd == "status":
+            cmd_status()
+        elif cmd == "history":
+            cmd_history()
+        elif cmd == "check":
+            cmd_check()
+        elif cmd == "target":
+            if not args:
+                if self.target:
+                    print(f"  Active target: {GOLD}{self.target}{RESET}")
+                else:
+                    print("  No active target set. Use: target <host>")
+            else:
+                self.target = args[0]
+                print(f"  Target set to: {GOLD}{self.target}{RESET}")
+        else:
+            if self.target:
+                args = [a.replace("$TARGET", self.target).replace("$t", self.target) for a in args]
+            try:
+                cmd_dispatch(cmd, args, in_console=True)
+            except SystemExit:
+                pass
+            except Exception as e:
+                print(f"  {RED}[!]{RESET} Command failed: {e}")
+
+
+def resolve_sigil():
+    """PATH first (cargo install / manual symlink), then release binary."""
+    if shutil.which("sigil"):
+        return ["sigil"]
+    rbin = cargo_release_bin("sigil")
+    if rbin:
+        return [str(rbin)]
+    return None  # caller falls back to cargo run --release
+
+
+def cmd_dispatch(tool, args, in_console=False):
     # resolve aliases before anything else
     tool = ALIASES.get(tool, tool)
 
@@ -414,6 +529,7 @@ def cmd_dispatch(tool, args):
         print(f"\n  {BOLD}install:{RESET}")
         print(f"  {GOLD}${RESET}  {info['install']}\n")
         if tool == "sigil":
+            # show what they're missing out on
             print(f"  {DIM}subcommands: {', '.join(SIGIL_SUBCMDS)}{RESET}\n")
         sys.exit(1)
 
@@ -425,52 +541,104 @@ def cmd_dispatch(tool, args):
               file=sys.stderr)
 
     if info["run"] == "bin":
-        HistoryManager.log_event(tool, args, 0.0, 0)
-        os.execvp(info["cmd"], [info["cmd"]] + args)
-
+        if in_console:
+            start_time = time.monotonic()
+            try:
+                result = subprocess.run([info["cmd"]] + args)
+                duration = time.monotonic() - start_time
+                HistoryManager.log_event(tool, args, duration, result.returncode)
+            except KeyboardInterrupt:
+                duration = time.monotonic() - start_time
+                HistoryManager.log_event(tool, args, duration, 130)
+        else:
+            HistoryManager.log_event(tool, args, 0.0, 0)
+            os.execvp(info["cmd"], [info["cmd"]] + args)
 
     elif info["run"] == "cargo":
         if tool == "sigil":
-            # PATH first, then the release binary, then cargo run
-            if shutil.which("sigil"):
-                HistoryManager.log_event(tool, args, 0.0, 0)
-                os.execvp("sigil", ["sigil"] + args)
-            rbin = cargo_release_bin("sigil")
-            if rbin:
-                HistoryManager.log_event(tool, args, 0.0, 0)
-                os.execvp(str(rbin), [str(rbin)] + args)
-            print(f"  {YELLOW}[!]{RESET} sigil not built yet, running via cargo "
-                  f"(this will take a minute)", file=sys.stderr)
-            start = time.monotonic()
-            result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
-            HistoryManager.log_event(tool, args, time.monotonic() - start, result.returncode)
-            sys.exit(result.returncode)
-
+            resolved = resolve_sigil()
+            if resolved:
+                if os.environ.get("NE0_DEBUG"):
+                    print(f"  {DIM}[debug] sigil binary: {resolved[0]}{RESET}", file=sys.stderr)
+                if in_console:
+                    start_time = time.monotonic()
+                    try:
+                        result = subprocess.run(resolved + args)
+                        duration = time.monotonic() - start_time
+                        HistoryManager.log_event(tool, args, duration, result.returncode)
+                    except KeyboardInterrupt:
+                        duration = time.monotonic() - start_time
+                        HistoryManager.log_event(tool, args, duration, 130)
+                else:
+                    HistoryManager.log_event(tool, args, 0.0, 0)
+                    os.execvp(resolved[0], resolved + args)
+            else:
+                # no built binary yet - build and run via cargo (slow first time)
+                print(f"  {YELLOW}[!]{RESET} sigil not built yet, running via cargo (this will take a minute)",
+                      file=sys.stderr)
+                print(f"  {DIM}run `cd {pdir} && cargo build --release` to avoid this next time{RESET}",
+                      file=sys.stderr)
+                start_time = time.monotonic()
+                try:
+                    result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+                    duration = time.monotonic() - start_time
+                    HistoryManager.log_event(tool, args, duration, result.returncode)
+                    if not in_console:
+                        sys.exit(result.returncode)
+                except KeyboardInterrupt:
+                    duration = time.monotonic() - start_time
+                    HistoryManager.log_event(tool, args, duration, 130)
+                    if not in_console:
+                        sys.exit(130)
         else:
+            # akame and any future rust tool follows the same pattern
             rbin = cargo_release_bin(tool)
             if rbin:
-                HistoryManager.log_event(tool, args, 0.0, 0)
-                os.execvp(str(rbin), [str(rbin)] + args)
+                if in_console:
+                    start_time = time.monotonic()
+                    try:
+                        result = subprocess.run([str(rbin)] + args)
+                        duration = time.monotonic() - start_time
+                        HistoryManager.log_event(tool, args, duration, result.returncode)
+                    except KeyboardInterrupt:
+                        duration = time.monotonic() - start_time
+                        HistoryManager.log_event(tool, args, duration, 130)
+                else:
+                    HistoryManager.log_event(tool, args, 0.0, 0)
+                    os.execvp(str(rbin), [str(rbin)] + args)
             else:
-                print(f"  {YELLOW}[!]{RESET} {tool} not built yet, running via cargo "
-                      f"(this will take a minute)", file=sys.stderr)
-                start = time.monotonic()
-                result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
-                HistoryManager.log_event(tool, args, time.monotonic() - start, result.returncode)
-                sys.exit(result.returncode)
-
+                start_time = time.monotonic()
+                try:
+                    result = subprocess.run(["cargo", "run", "--release", "--"] + args, cwd=pdir)
+                    duration = time.monotonic() - start_time
+                    HistoryManager.log_event(tool, args, duration, result.returncode)
+                    if not in_console:
+                        sys.exit(result.returncode)
+                except KeyboardInterrupt:
+                    duration = time.monotonic() - start_time
+                    HistoryManager.log_event(tool, args, duration, 130)
+                    if not in_console:
+                        sys.exit(130)
 
     elif info["run"] == "bash":
-        start = time.monotonic()
-        result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
-        HistoryManager.log_event(tool, args, time.monotonic() - start, result.returncode)
-        sys.exit(result.returncode)
-
+        start_time = time.monotonic()
+        try:
+            result = subprocess.run(["bash", str(pdir / "install.sh")] + args, cwd=pdir)
+            duration = time.monotonic() - start_time
+            HistoryManager.log_event(tool, args, duration, result.returncode)
+            if not in_console:
+                sys.exit(result.returncode)
+        except KeyboardInterrupt:
+            duration = time.monotonic() - start_time
+            HistoryManager.log_event(tool, args, duration, 130)
+            if not in_console:
+                sys.exit(130)
 
 
 def main():
     args = sys.argv[1:]
 
+    # no args at all - just show the help, don't error out
     if not args or args[0] in ("-h", "--help", "help"):
         print_banner()
         print(HELP)
