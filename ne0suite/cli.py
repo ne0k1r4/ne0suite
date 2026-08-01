@@ -205,6 +205,14 @@ TOOLS = {
         "ver_probe": None,  # a script, not a versioned binary
         "install":   "git clone https://github.com/ne0k1r4/kira-installer ~/dev/projects/kira-installer",
     },
+    "adcs": {
+        "cmd":       "ne0adcs",
+        "project":   "ne0adcs",
+        "run":       "bin",
+        "desc":      "AD CS attack toolkit — ESC1/3/4/6, shadow creds, autopwn",
+        "ver_probe": ("flag", "--version"),
+        "install":   "pip install -e ~/dev/projects/ne0adcs",
+    },
 }
 
 # short aliases so i don't have to type the full name every single time
@@ -238,6 +246,7 @@ HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  console 
   {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
   {CYAN}sigil{RESET}      {DIM}analyze{RESET}    PE/ELF static analyzer {DIM}(Rust){RESET}
   {CYAN}kira-installer{RESET} {DIM}install{RESET} Env bootstrap
+  {CYAN}adcs{RESET}      {DIM}cert{RESET}      AD CS attack toolkit — ESC1/3/4/6, shadow, autopwn
 """
 
 
