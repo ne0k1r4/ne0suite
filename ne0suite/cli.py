@@ -227,6 +227,7 @@ ALIASES = {
     "c2":      "akame",
     "analyze": "sigil",
     "install": "kira-installer",
+    "cert":    "adcs",  # the whole ESC chain is certificate attacks
 }
 
 # pulled from sigil's clap subcommands in src/main.rs
