@@ -5,3 +5,12 @@ __pycache__/
 .eggs/
 build/
 dist/
+.lightscan_cp.json
+
+# shadowci output dumps
+shadowci_report.html
+shadowci_report.json
+shadowci_report.md
+
+# local history-build staging (never commit this)
+.n0hist/
