@@ -4,6 +4,8 @@ setup(
     name="ne0suite",
     version="1.3.0",
     description="Unified Operator CLI — GRIMOIRE · LightScan · WRAITH-NET · ShadowCI · akame · sigil · ADCS",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
     author="Light",
     author_email="neok1ra@proton.me",
     url="https://github.com/ne0k1r4/ne0suite",
