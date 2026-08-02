@@ -9,7 +9,7 @@
   ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝
 ```
 
-[![Version](https://img.shields.io/badge/version-1.2.0-cc0000?style=for-the-badge&labelColor=0a0000)](https://github.com/ne0k1r4/ne0suite)
+[![Version](https://img.shields.io/badge/version-1.3.0-cc0000?style=for-the-badge&labelColor=0a0000)](https://github.com/ne0k1r4/ne0suite)
 [![Python](https://img.shields.io/badge/python-3.10+-cc0000?style=for-the-badge&logo=python&logoColor=white&labelColor=0a0000)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-cc0000?style=for-the-badge&labelColor=0a0000)](LICENSE)
 
@@ -90,3 +90,21 @@ files created during installation:
 
 * `~/.grimoire/config.json`
 * `~/.wraith-net/config.json`
+
+---
+
+## Release notes
+
+**v1.3.0** — AD CS toolkit integrated as a first-class tool (`ne0suite adcs`,
+alias `cert`). ne0adcs is installed by `install.sh` and reports its version in
+`ne0suite status`.
+
+**v1.2.0** — `ne0suite console` (readline tab completion, `target` variable),
+`ne0suite history`, `ne0suite check`. All dispatches are logged to
+`~/.ne0suite/history.json`.
+
+**v1.0.0** — animated banner, `ne0suite status` with per-tool version probing
+and a spinner, sigil/akame cargo resolution, kira-installer bash dispatch.
+
+**v0.1.0** — first working dispatcher: tool registry, alias resolution,
+subprocess passthrough, help output.
