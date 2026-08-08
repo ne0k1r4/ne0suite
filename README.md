@@ -9,7 +9,7 @@
   ╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   ╚══════╝
 ```
 
-[![Version](https://img.shields.io/badge/version-1.3.0-cc0000?style=for-the-badge&labelColor=0a0000)](https://github.com/ne0k1r4/ne0suite)
+[![Version](https://img.shields.io/badge/version-1.4.0-cc0000?style=for-the-badge&labelColor=0a0000)](https://github.com/ne0k1r4/ne0suite)
 [![Python](https://img.shields.io/badge/python-3.10+-cc0000?style=for-the-badge&logo=python&logoColor=white&labelColor=0a0000)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-cc0000?style=for-the-badge&labelColor=0a0000)](LICENSE)
 
@@ -113,6 +113,11 @@ files created during installation:
 ---
 
 ## Release notes
+
+**v1.4.0** — akame operator shortcuts: `ne0suite akame task <session> <type>`
+queues tasks (logins, shell, dpapi, ...) against a running teamserver via its
+REST API, with `--wait` for the result; `ne0suite akame sessions` lists
+checked-in implants.
 
 **v1.3.0** — AD CS toolkit integrated as a first-class tool (`ne0suite adcs`,
 alias `cert`). ne0adcs is installed by `install.sh` and reports its version in

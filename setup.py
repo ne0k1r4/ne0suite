@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ne0suite",
-    version="1.3.0",
+    version="1.4.0",
     description="Unified Operator CLI — GRIMOIRE · LightScan · WRAITH-NET · ShadowCI · akame · sigil · ADCS",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
