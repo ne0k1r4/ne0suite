@@ -23,6 +23,8 @@ import shutil
 import subprocess
 import time
 import json
+import urllib.request
+import urllib.error
 from datetime import datetime
 from pathlib import Path
 
@@ -580,8 +582,6 @@ def akame_api_token():
 
 def akame_sessions():
     """List sessions registered on the running teamserver."""
-    import urllib.request
-
     url = f"{akame_api_base()}/sessions"
     req = urllib.request.Request(url)
     token = akame_api_token()
@@ -601,7 +601,7 @@ def akame_sessions():
     print(f"  {BOLD}{'SESSION ID':<38} {'HOST':<20} {'USER':<16} {'OS'}{RESET}")
     print(f"  {'─' * 78}")
     for s in sessions:
-        print(f"  {CYAN}{s.get('id', '?')}{RESET:<38} "
+        print(f"  {CYAN}{s.get('id', '?'):<38}{RESET} "
               f"{s.get('hostname', '?'):<20} "
               f"{s.get('username', '?'):<16} "
               f"{s.get('os', '?')} {s.get('arch', '')}")
@@ -613,8 +613,6 @@ def akame_task(args):
     Optional --wait blocks until the implant reports a result and prints it.
     Without it, just the queued task id comes back.
     """
-    import urllib.request
-
     if len(args) < 2:
         print(f"  {YELLOW}usage:{RESET} ne0suite akame task <session_id> <type> [key=value ...] [--wait]")
         print(f"  {DIM}types: {', '.join(AKAME_TASKS)}{RESET}")
@@ -655,24 +653,32 @@ def akame_task(args):
         print(f"  {DIM}re-run with --wait to block for the result{RESET}")
         return
 
-    import time
-
+    # poll the result endpoint until the implant reports back. a 404 means
+    # the task simply hasn't been picked up yet — anything else (bad token,
+    # server error) is real and worth failing on instead of spinning.
     deadline = time.monotonic() + 60
     while time.monotonic() < deadline:
         time.sleep(2)
+        rurl = f"{akame_api_base()}/tasks/{task_id}/result"
+        rreq = urllib.request.Request(rurl)
+        if token:
+            rreq.add_header("Authorization", f"Bearer {token}")
         try:
-            rurl = f"{akame_api_base()}/tasks/{task_id}/result"
-            rreq = urllib.request.Request(rurl)
-            if token:
-                rreq.add_header("Authorization", f"Bearer {token}")
             with urllib.request.urlopen(rreq, timeout=5) as r:
                 res = json.loads(r.read())
             break
-        except Exception:
-            res = None  # not done yet — implant hasn't checked in
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                continue  # not done yet — implant hasn't checked in
+            print(f"  {RED}[!]{RESET} result fetch failed: HTTP {e.code} — {e.reason}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"  {RED}[!]{RESET} result fetch failed: {e}")
+            sys.exit(1)
     else:
         print(f"  {YELLOW}[!]{RESET} no result within 60s (implant idle?) — poll with:")
-        print(f"  {DIM}curl -H 'Authorization: Bearer {token}' "
+        tok = token or "<set AKAME_API_TOKEN>"
+        print(f"  {DIM}curl -H 'Authorization: Bearer {tok}' "
               f"{akame_api_base()}/tasks/{task_id}/result{RESET}")
         sys.exit(1)
 
