@@ -40,6 +40,24 @@ different ways the tools get run: PATH binaries, Rust release binaries (with a
 `ne0suite adcs <command>` dispatches straight into the toolkit (`enum`, `esc1`,
 `esc3`, `esc4`, `esc6`, `shadow`, `list`, `audit`, `autopwn`).
 
+akame is a teamserver, so `ne0suite akame` shortcuts its operator API instead
+of spawning a second server:
+
+```bash
+# list implants currently checked in
+ne0suite akame sessions
+
+# queue a task on a session (type from server/src/task.rs)
+ne0suite akame task <session_id> logins
+
+# block until the implant reports back, then print the output
+ne0suite akame task <session_id> shell cmd=id --wait
+```
+
+The API base defaults to `http://127.0.0.1:8443` (override with `AKAME_API`)
+and the bearer token comes from `AKAME_API_TOKEN` or the `akame_token` key in
+`~/.ne0suite/config.json`.
+
 ---
 
 ## Installation & Setup
@@ -70,6 +88,7 @@ ne0suite wraith scan target.com
 ne0suite lightscan --scan -t 10.0.0.1 -p top100 --sv --cve
 ne0suite grimoire sentinel --ioc 1.2.3.4
 ne0suite shadowci scan /path/to/repo
+ne0suite akame task <session_id> logins   # queue a logins task on a live c2
 
 # interactive shell with tab completion
 ne0suite console
